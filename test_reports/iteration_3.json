@@ -1,0 +1,26 @@
+{
+  "summary": "Phase 3 (Admin User Management + Roadmap CRUD) tested end-to-end. Backend auth matrix, self-protection rules, slug validation, draft/published/archived workflow, and frontend AdminUsers/AdminRoadmaps role gating all pass. No blockers.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "GET /api/admin/users matrix: unauth=401, user=403, editor=403, admin=200",
+    "PATCH /api/admin/users/{id}/role matrix: user=403, editor=403, admin=200 (and value persists across reload)",
+    "DELETE /api/admin/users/{id} matrix: user=403, editor=403",
+    "Self-protection: PATCH admin self role=editor returns 400 'Admin cannot demote themselves'; DELETE admin self returns 400 'Cannot delete yourself'",
+    "POST /api/roadmaps matrix: unauth=401, user=403, editor=201, admin (implicit via editor allowed)",
+    "PUT /api/roadmaps/{id}: user=403, editor=200",
+    "PATCH /api/roadmaps/{id}/status: user=403, editor=200",
+    "DELETE /api/roadmaps/{id}: user=403, editor=403, admin=204",
+    "GET /api/admin/roadmaps: user=403, editor=200, admin=200",
+    "Slug validations: duplicate slug 'frontend'=409; invalid 'INVALID SLUG'=422",
+    "Status workflow: draft hidden from public GET /api/roadmaps; published appears; archived hidden again",
+    "Frontend (user@example.com): /admin/users and /admin/roadmaps redirect to /; nav-admin-users and nav-admin-roadmaps absent",
+    "Frontend (editor@example.com) AdminRoadmaps: rows for frontend/backend/devops present; created qa-test via dialog form; status badge updates draft->published via select; admin-delete-roadmap-qa-test correctly NOT rendered for editor",
+    "Frontend (admin@example.com) AdminUsers: nav-admin-users present; table rows for all three users; admin self select disabled; changing user@example.com role to editor persists after page reload; reverted to user; qa-test cleanup delete works"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Login redirects to /dashboard not /. Cleanup performed: created qa-test deleted; user@example.com role reverted to 'user'. An unrelated 'Test' roadmap (slug test-rm) created in a prior iteration remains in the DB."
+}

@@ -31,6 +31,22 @@ export default function Navbar() {
               Dashboard
             </NavLink>
           )}
+          {user && (user.role === "admin" || user.role === "editor") && (
+            <NavLink to="/admin/roadmaps" data-testid="nav-admin-roadmaps"
+              className={({ isActive }) =>
+                `transition-colors hover:text-slate-900 ${isActive ? "text-slate-900 font-medium" : "text-slate-500"}`
+              }>
+              Manage roadmaps
+            </NavLink>
+          )}
+          {user && user.role === "admin" && (
+            <NavLink to="/admin/users" data-testid="nav-admin-users"
+              className={({ isActive }) =>
+                `transition-colors hover:text-slate-900 ${isActive ? "text-slate-900 font-medium" : "text-slate-500"}`
+              }>
+              Users
+            </NavLink>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">

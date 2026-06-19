@@ -9,6 +9,8 @@ import RoadmapDetail from "@/pages/RoadmapDetail";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
+import AdminUsers from "@/pages/AdminUsers";
+import AdminRoadmaps from "@/pages/AdminRoadmaps";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 export default function App() {
@@ -23,6 +25,12 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={
             <ProtectedRoute><Dashboard /></ProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <ProtectedRoute><AdminUsers /></ProtectedRoute>
+          } />
+          <Route path="/admin/roadmaps" element={
+            <ProtectedRoute><AdminRoadmaps /></ProtectedRoute>
           } />
         </Routes>
       </BrowserRouter>

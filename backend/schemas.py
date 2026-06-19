@@ -97,6 +97,30 @@ class LinkCreateIn(BaseModel):
     style: str = "solid"
 
 
+# ---------- Admin ----------
+class RoleUpdateIn(BaseModel):
+    role: Role
+
+
+class RoadmapCreateIn(BaseModel):
+    slug: str = Field(min_length=2, max_length=60, pattern=r"^[a-z0-9-]+$")
+    title: str = Field(min_length=1, max_length=120)
+    description: str = ""
+    cover_emoji: str = "🗺️"
+    status: Literal["draft", "published", "archived"] = "draft"
+
+
+class RoadmapUpdateIn(BaseModel):
+    slug: Optional[str] = Field(default=None, min_length=2, max_length=60, pattern=r"^[a-z0-9-]+$")
+    title: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    description: Optional[str] = None
+    cover_emoji: Optional[str] = None
+
+
+class RoadmapStatusIn(BaseModel):
+    status: Literal["draft", "published", "archived"]
+
+
 class RoadmapSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

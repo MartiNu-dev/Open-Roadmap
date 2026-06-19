@@ -32,9 +32,13 @@ from schemas import (
     ProgressOut,
     ProgressUpsertIn,
     RegisterIn,
+    RoadmapCreateIn,
     RoadmapDetail,
     RoadmapProgressSummary,
+    RoadmapStatusIn,
     RoadmapSummary,
+    RoadmapUpdateIn,
+    RoleUpdateIn,
     TokenOut,
     UserOut,
 )
@@ -277,6 +281,144 @@ def delete_link(
         raise HTTPException(status_code=404, detail="Link not found")
     db.delete(link)
     db.commit()
+    return None
+
+
+# --------------- ROADMAP CRUD (editor + admin) ---------------
+@api.get("/admin/roadmaps", response_model=List[RoadmapSummary])
+def list_all_roadmaps(
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(Roadmap, func.count(RoadmapBlock.id).label("block_count"))
+        .outerjoin(RoadmapBlock, RoadmapBlock.roadmap_id == Roadmap.id)
+        .group_by(Roadmap.id)
+        .order_by(Roadmap.created_at.asc())
+        .all()
+    )
+    return [
+        RoadmapSummary(
+            id=r.id, slug=r.slug, title=r.title, description=r.description,
+            status=r.status, cover_emoji=r.cover_emoji, block_count=int(count),
+        )
+        for r, count in rows
+    ]
+
+
+@api.post("/roadmaps", response_model=RoadmapSummary, status_code=201)
+def create_roadmap(
+    payload: RoadmapCreateIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    if db.query(Roadmap).filter(Roadmap.slug == payload.slug).first():
+        raise HTTPException(status_code=409, detail="Slug already in use")
+    rm = Roadmap(
+        slug=payload.slug, title=payload.title, description=payload.description,
+        cover_emoji=payload.cover_emoji, status=payload.status,
+    )
+    db.add(rm); db.commit(); db.refresh(rm)
+    return RoadmapSummary(
+        id=rm.id, slug=rm.slug, title=rm.title, description=rm.description,
+        status=rm.status, cover_emoji=rm.cover_emoji, block_count=0,
+    )
+
+
+@api.put("/roadmaps/{roadmap_id}", response_model=RoadmapSummary)
+def update_roadmap(
+    roadmap_id: str,
+    payload: RoadmapUpdateIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    rm = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
+    if rm is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    data = payload.model_dump(exclude_unset=True)
+    if "slug" in data and data["slug"] != rm.slug:
+        if db.query(Roadmap).filter(Roadmap.slug == data["slug"]).first():
+            raise HTTPException(status_code=409, detail="Slug already in use")
+    for k, v in data.items():
+        setattr(rm, k, v)
+    db.commit(); db.refresh(rm)
+    block_count = db.query(func.count(RoadmapBlock.id)).filter(RoadmapBlock.roadmap_id == rm.id).scalar() or 0
+    return RoadmapSummary(
+        id=rm.id, slug=rm.slug, title=rm.title, description=rm.description,
+        status=rm.status, cover_emoji=rm.cover_emoji, block_count=int(block_count),
+    )
+
+
+@api.patch("/roadmaps/{roadmap_id}/status", response_model=RoadmapSummary)
+def set_roadmap_status(
+    roadmap_id: str,
+    payload: RoadmapStatusIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    rm = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
+    if rm is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    rm.status = payload.status
+    db.commit(); db.refresh(rm)
+    block_count = db.query(func.count(RoadmapBlock.id)).filter(RoadmapBlock.roadmap_id == rm.id).scalar() or 0
+    return RoadmapSummary(
+        id=rm.id, slug=rm.slug, title=rm.title, description=rm.description,
+        status=rm.status, cover_emoji=rm.cover_emoji, block_count=int(block_count),
+    )
+
+
+@api.delete("/roadmaps/{roadmap_id}", status_code=204)
+def delete_roadmap(
+    roadmap_id: str,
+    _: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    rm = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
+    if rm is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    db.delete(rm); db.commit()
+    return None
+
+
+# --------------- ADMIN: USER MANAGEMENT (admin only) ---------------
+@api.get("/admin/users", response_model=List[UserOut])
+def admin_list_users(
+    _: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    return [UserOut.model_validate(u) for u in db.query(User).order_by(User.created_at.asc()).all()]
+
+
+@api.patch("/admin/users/{user_id}/role", response_model=UserOut)
+def admin_set_user_role(
+    user_id: str,
+    payload: RoleUpdateIn,
+    current: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    target = db.query(User).filter(User.id == user_id).first()
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == current.id and payload.role != "admin":
+        raise HTTPException(status_code=400, detail="Admin cannot demote themselves")
+    target.role = payload.role
+    db.commit(); db.refresh(target)
+    return UserOut.model_validate(target)
+
+
+@api.delete("/admin/users/{user_id}", status_code=204)
+def admin_delete_user(
+    user_id: str,
+    current: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    if user_id == current.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    target = db.query(User).filter(User.id == user_id).first()
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(target); db.commit()
     return None
 
 
