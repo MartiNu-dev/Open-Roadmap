@@ -15,6 +15,23 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 - Schema: User, Roadmap, RoadmapBlock, BlockResource, UserProgress (unique on user_id+block_id)
 - Auth: Bearer JWT (7 day expiry) + dependency-injected `get_current_user`, `require_roles(...)`
 
+## Phase 2 — DONE (2026-02): 2D Canvas Editor + Viewer
+- [x] Schema: `RoadmapBlock` extended with x/y/width/height/node_style; new `RoadmapLink` table
+- [x] Lightweight SQLite migration (`/app/backend/migrations.py`) — adds columns to existing DB on startup
+- [x] Auto layout backfill: zigzag positioning (3 columns) + sequential links for every roadmap that lacks them
+- [x] Canvas endpoints (admin/editor only via `require_roles`):
+      `PATCH /api/blocks/{id}/position`, `PUT /api/blocks/{id}`,
+      `POST /api/roadmaps/{id}/blocks`, `DELETE /api/blocks/{id}`,
+      `POST /api/roadmaps/{id}/links`, `DELETE /api/links/{id}`
+- [x] Validation: self-links and cross-roadmap links rejected with 400
+- [x] Frontend `RoadmapCanvas.jsx`: dotted grid background, curved SVG link layer, absolutely positioned cards
+- [x] Drag-to-reposition blocks in editor mode (persisted via PATCH)
+- [x] Link-creation flow (pick source → pick target) and one-click link delete (× on path midpoint)
+- [x] Edit form inside side panel: title, short description, detailed content, level, duration, block style (primary/alternative/optional/label)
+- [x] Add block + delete block from editor toolbar / side panel
+- [x] Status overlay per block in viewer mode (green check / blue spinner)
+- [x] Role gating: edit toggle is only visible to admin/editor
+
 ## Phase 1 — DONE (2026-02)
 - [x] DB models (User, Roadmap, RoadmapBlock, BlockResource, UserProgress)
 - [x] Auth: register/login/logout/me, bcrypt + JWT, role field
