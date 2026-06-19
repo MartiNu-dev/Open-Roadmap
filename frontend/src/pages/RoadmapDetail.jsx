@@ -92,15 +92,24 @@ export default function RoadmapDetail() {
   };
 
   const handleAddBlock = async () => {
-    const title = window.prompt("New block title?");
-    if (!title) return;
     try {
       const { data } = await api.post(`/roadmaps/${roadmap.id}/blocks`, {
-        title, short_description: "", detailed_content: "",
-        level: "beginner", estimated_duration: "", node_style: "primary",
+        title: "Block", short_description: "", detailed_content: "",
+        level: "", estimated_duration: "", node_style: "primary",
         x: 320, y: 80, width: 220, height: 64,
       });
       setRoadmap((rm) => ({ ...rm, blocks: [...rm.blocks, data] }));
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
+  const handleSelectLink = async (link) => {
+    const label = window.prompt("Link label (optional, leave empty to clear):", link.label || "");
+    if (label === null) return;
+    const style = window.prompt("Style? Type 'solid' or 'dashed':", link.style || "solid");
+    if (style === null) return;
+    try {
+      const { data } = await api.patch(`/links/${link.id}`, { label, style: style === "dashed" ? "dashed" : "solid" });
+      setRoadmap((rm) => ({ ...rm, links: rm.links.map((l) => l.id === data.id ? data : l) }));
     } catch (e) { alert(formatApiError(e)); }
   };
 
@@ -201,6 +210,7 @@ export default function RoadmapDetail() {
           onMoveBlock={handleMoveBlock}
           onCreateLink={handleCreateLink}
           onDeleteLink={handleDeleteLink}
+          onSelectLink={handleSelectLink}
           onAddBlock={handleAddBlock}
         />
       </div>

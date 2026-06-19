@@ -69,6 +69,7 @@ class LinkOut(BaseModel):
     from_block_id: str
     to_block_id: str
     style: str
+    label: str = ""
 
 
 class BlockPositionIn(BaseModel):
@@ -82,7 +83,7 @@ class BlockUpsertIn(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     short_description: str = ""
     detailed_content: str = ""
-    level: str = "beginner"
+    level: str = ""
     estimated_duration: str = ""
     node_style: str = "primary"
     x: int = 0
@@ -95,6 +96,12 @@ class LinkCreateIn(BaseModel):
     from_block_id: str
     to_block_id: str
     style: str = "solid"
+    label: str = ""
+
+
+class LinkUpdateIn(BaseModel):
+    style: Optional[str] = None
+    label: Optional[str] = None
 
 
 # ---------- Admin ----------

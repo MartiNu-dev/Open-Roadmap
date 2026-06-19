@@ -13,7 +13,12 @@ def run_migrations(engine: Engine) -> None:
         "height": "INTEGER NOT NULL DEFAULT 64",
         "node_style": "VARCHAR NOT NULL DEFAULT 'primary'",
     }
+    link_cols = {c["name"] for c in insp.get_columns("roadmap_links")} if "roadmap_links" in insp.get_table_names() else set()
+    link_needed = {"label": "VARCHAR NOT NULL DEFAULT ''"}
     with engine.begin() as conn:
         for name, ddl in needed.items():
             if name not in cols:
                 conn.execute(text(f"ALTER TABLE roadmap_blocks ADD COLUMN {name} {ddl}"))
+        for name, ddl in link_needed.items():
+            if link_cols and name not in link_cols:
+                conn.execute(text(f"ALTER TABLE roadmap_links ADD COLUMN {name} {ddl}"))

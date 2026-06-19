@@ -28,6 +28,7 @@ from schemas import (
     BlockUpsertIn,
     LinkCreateIn,
     LinkOut,
+    LinkUpdateIn,
     LoginIn,
     ProgressOut,
     ProgressUpsertIn,
@@ -263,8 +264,27 @@ def create_link(
         from_block_id=payload.from_block_id,
         to_block_id=payload.to_block_id,
         style=payload.style,
+        label=payload.label,
     )
     db.add(link)
+    db.commit()
+    db.refresh(link)
+    return LinkOut.model_validate(link)
+
+
+@api.patch("/links/{link_id}", response_model=LinkOut)
+def update_link(
+    link_id: str,
+    payload: "LinkUpdateIn",
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    link = db.query(RoadmapLink).filter(RoadmapLink.id == link_id).first()
+    if link is None:
+        raise HTTPException(status_code=404, detail="Link not found")
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(link, k, v)
     db.commit()
     db.refresh(link)
     return LinkOut.model_validate(link)

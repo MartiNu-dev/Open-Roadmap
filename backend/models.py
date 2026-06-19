@@ -115,4 +115,5 @@ class RoadmapLink(Base):
     from_block_id = Column(String, ForeignKey("roadmap_blocks.id", ondelete="CASCADE"), nullable=False)
     to_block_id = Column(String, ForeignKey("roadmap_blocks.id", ondelete="CASCADE"), nullable=False)
     style = Column(String, nullable=False, default="solid")  # solid | dashed
+    label = Column(String, nullable=False, default="")
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)

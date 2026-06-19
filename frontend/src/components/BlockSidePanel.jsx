@@ -21,7 +21,7 @@ const STYLE_OPTIONS = [
   { value: "label", label: "Label (no border)" },
 ];
 
-const LEVEL_OPTIONS = ["beginner", "intermediate", "advanced"];
+const LEVEL_OPTIONS = ["", "beginner", "intermediate", "advanced"];
 
 export default function BlockSidePanel({
   open, onOpenChange, block, progress, onStatusChange, canEdit,
@@ -88,7 +88,7 @@ export default function BlockSidePanel({
                   <Label>Level</Label>
                   <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
                     value={form.level} onChange={(e) => setField("level", e.target.value)} data-testid="edit-block-level">
-                    {LEVEL_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    {LEVEL_OPTIONS.map((l) => <option key={l || "none"} value={l}>{l || "— none —"}</option>)}
                   </select>
                 </div>
                 <div>

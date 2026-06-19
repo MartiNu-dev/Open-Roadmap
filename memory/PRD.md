@@ -15,6 +15,16 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 - Schema: User, Roadmap, RoadmapBlock, BlockResource, UserProgress (unique on user_id+block_id)
 - Auth: Bearer JWT (7 day expiry) + dependency-injected `get_current_user`, `require_roles(...)`
 
+## Phase 4 — DONE (2026-02): Canvas UX polish
+- [x] Drag-vs-click: dragging a block no longer opens its side panel (4px movement threshold + 50ms suppression window after mouseup)
+- [x] Canvas auto-expands to fit content (removed `maxHeight` cap)
+- [x] "Add block" is silent: instantly creates a block titled "Block" with empty level (no prompt)
+- [x] `level` is now optional (empty string allowed) — backend default changed to ""
+- [x] Crown emoji 👑 in top-left of each block when level is set; colored per level: yellow=beginner, slate=intermediate, amber=advanced
+- [x] Anchor-drag link creation: hovering a block in edit mode reveals 4 blue circles (top/right/bottom/left); mousedown on one + mouseup over another block creates the link (replaces previous click-source / click-target flow)
+- [x] Link properties: backend `RoadmapLink.label` column + migration; PATCH /api/links/{id} for {label, style}; label rendered mid-line in a rounded white pill; small blue dot at link midpoint opens edit prompt
+- [ ] Deferred to next round: link color picker + thickness picker (label + dashed/solid shipped now)
+
 ## Phase 3 — DONE (2026-02): Admin User Management + Roadmap CRUD
 - [x] Backend admin user mgmt: `GET /api/admin/users`, `PATCH /api/admin/users/{id}/role`, `DELETE /api/admin/users/{id}` (admin-only)
 - [x] Self-protection: admin cannot demote or delete themselves (400)
