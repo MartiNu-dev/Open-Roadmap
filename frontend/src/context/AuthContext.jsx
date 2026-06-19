@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import api, { formatApiError } from "@/lib/api";
 
 const AuthContext = createContext(null);
@@ -17,7 +17,8 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.get("/auth/me");
       setUser(data);
-    } catch {
+    } catch (err) {
+      console.error("auth/me failed:", err);
       localStorage.removeItem("rm_token");
       setUser(null);
     } finally {
@@ -25,9 +26,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => {
-    refreshMe();
-  }, [refreshMe]);
+  useEffect(() => { refreshMe(); }, [refreshMe]);
 
   const login = useCallback(async (email, password) => {
     try {
@@ -36,6 +35,7 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       return { ok: true };
     } catch (err) {
+      console.error("login failed:", err);
       return { ok: false, error: formatApiError(err) };
     }
   }, []);
@@ -47,21 +47,24 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       return { ok: true };
     } catch (err) {
+      console.error("register failed:", err);
       return { ok: false, error: formatApiError(err) };
     }
   }, []);
 
   const logout = useCallback(async () => {
-    try { await api.post("/auth/logout"); } catch { /* noop */ }
+    try { await api.post("/auth/logout"); }
+    catch (err) { console.error("logout request failed (ignored):", err); }
     localStorage.removeItem("rm_token");
     setUser(null);
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshMe }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, loading, login, register, logout, refreshMe }),
+    [user, loading, login, register, logout, refreshMe]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

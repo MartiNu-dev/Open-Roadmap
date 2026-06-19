@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+const REMARK_PLUGINS = [remarkGfm];
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,7 +136,7 @@ export default function BlockSidePanel({
                 <div>
                   <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">Overview</h4>
                   <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed" data-testid="block-content-markdown">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.detailed_content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{block.detailed_content}</ReactMarkdown>
                   </div>
                 </div>
               )}

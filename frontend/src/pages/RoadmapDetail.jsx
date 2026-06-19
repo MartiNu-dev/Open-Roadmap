@@ -34,7 +34,9 @@ export default function RoadmapDetail() {
     try {
       const { data } = await api.get(`/progress/me/${rid}`);
       setProgressItems(data.items);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error("Failed to load progress:", err);
+    }
   };
 
   useEffect(() => { loadRoadmap(); }, [slug]);

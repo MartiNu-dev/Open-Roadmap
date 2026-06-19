@@ -9,7 +9,9 @@ export default function Home() {
   const [roadmaps, setRoadmaps] = useState([]);
 
   useEffect(() => {
-    api.get("/roadmaps").then(({ data }) => setRoadmaps(data)).catch(() => {});
+    api.get("/roadmaps")
+      .then(({ data }) => setRoadmaps(data))
+      .catch((err) => console.error("Failed to load roadmaps:", err));
   }, []);
 
   return (
