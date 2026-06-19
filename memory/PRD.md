@@ -15,6 +15,16 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 - Schema: User, Roadmap, RoadmapBlock, BlockResource, UserProgress (unique on user_id+block_id)
 - Auth: Bearer JWT (7 day expiry) + dependency-injected `get_current_user`, `require_roles(...)`
 
+## Phase 5 — DONE (2026-02): Canvas UX round 2
+- [x] Auto-save in block edit form (debounced 500ms; status text "Auto-saves as you type")
+- [x] Double-click on empty canvas area creates a new block at the cursor position
+- [x] Right-click on empty canvas area opens a context menu with "Add block here" — block created at click coords
+- [x] Drag-then-click suppression: 100ms `suppressClickRef` window after a drag — clicking no longer opens the panel after moving a block
+- [x] Anchor-side persistence: link records `from_side` and `to_side`; rendered SVG path now starts from the exact side handle the editor dragged from, and ends on the side the cursor was over
+- [x] Click OR right-click on a link opens `LinkSidePanel` (Sheet)
+- [x] Link panel exposes: label, style (solid/dashed/dotted), thickness (small/medium/large), color (preset swatches + native picker), from_side & to_side (selects). Auto-saves on change.
+- [x] Backend: added `color`, `thickness`, `from_side`, `to_side` columns to `roadmap_links` with idempotent SQLite migration; LinkCreateIn / LinkUpdateIn / LinkOut extended
+
 ## Phase 4 — DONE (2026-02): Canvas UX polish
 - [x] Drag-vs-click: dragging a block no longer opens its side panel (4px movement threshold + 50ms suppression window after mouseup)
 - [x] Canvas auto-expands to fit content (removed `maxHeight` cap)

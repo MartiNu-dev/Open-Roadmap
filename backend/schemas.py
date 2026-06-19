@@ -70,6 +70,10 @@ class LinkOut(BaseModel):
     to_block_id: str
     style: str
     label: str = ""
+    color: str = "#475569"
+    thickness: str = "medium"
+    from_side: str = "bottom"
+    to_side: str = "top"
 
 
 class BlockPositionIn(BaseModel):
@@ -97,11 +101,19 @@ class LinkCreateIn(BaseModel):
     to_block_id: str
     style: str = "solid"
     label: str = ""
+    color: str = "#475569"
+    thickness: str = "medium"
+    from_side: str = "bottom"
+    to_side: str = "top"
 
 
 class LinkUpdateIn(BaseModel):
     style: Optional[str] = None
     label: Optional[str] = None
+    color: Optional[str] = None
+    thickness: Optional[str] = None
+    from_side: Optional[str] = None
+    to_side: Optional[str] = None
 
 
 # ---------- Admin ----------

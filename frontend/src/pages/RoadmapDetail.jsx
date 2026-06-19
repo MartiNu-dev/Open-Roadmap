@@ -4,6 +4,7 @@ import api, { formatApiError } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/context/AuthContext";
 import BlockSidePanel from "@/components/BlockSidePanel";
+import LinkSidePanel from "@/components/LinkSidePanel";
 import RoadmapCanvas from "@/components/RoadmapCanvas";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ export default function RoadmapDetail() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [selectedLink, setSelectedLink] = useState(null);
+  const [linkPanelOpen, setLinkPanelOpen] = useState(false);
 
   const isEditor = !!user && (user.role === "admin" || user.role === "editor");
 
@@ -74,11 +77,13 @@ export default function RoadmapDetail() {
     } catch (e) { alert(formatApiError(e)); }
   };
 
-  const handleCreateLink = async (fromId, toId) => {
+  const handleCreateLink = async (payload) => {
+    // payload: {from_block_id, to_block_id, from_side, to_side} OR (legacy) just from/to ids
+    const body = typeof payload === "object" && payload.from_block_id
+      ? { style: "solid", ...payload }
+      : { from_block_id: arguments[0], to_block_id: arguments[1], style: "solid", from_side: "bottom", to_side: "top" };
     try {
-      const { data } = await api.post(`/roadmaps/${roadmap.id}/links`, {
-        from_block_id: fromId, to_block_id: toId, style: "solid",
-      });
+      const { data } = await api.post(`/roadmaps/${roadmap.id}/links`, body);
       setRoadmap((rm) => ({ ...rm, links: [...rm.links, data] }));
     } catch (e) { alert(formatApiError(e)); }
   };
@@ -91,25 +96,40 @@ export default function RoadmapDetail() {
     } catch (e) { alert(formatApiError(e)); }
   };
 
-  const handleAddBlock = async () => {
+  const handleAddBlock = async () => handleAddBlockAt(320, 80);
+
+  const handleAddBlockAt = async (x, y) => {
     try {
       const { data } = await api.post(`/roadmaps/${roadmap.id}/blocks`, {
         title: "Block", short_description: "", detailed_content: "",
         level: "", estimated_duration: "", node_style: "primary",
-        x: 320, y: 80, width: 220, height: 64,
+        x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), width: 220, height: 64,
       });
       setRoadmap((rm) => ({ ...rm, blocks: [...rm.blocks, data] }));
     } catch (e) { alert(formatApiError(e)); }
   };
 
-  const handleSelectLink = async (link) => {
-    const label = window.prompt("Link label (optional, leave empty to clear):", link.label || "");
-    if (label === null) return;
-    const style = window.prompt("Style? Type 'solid' or 'dashed':", link.style || "solid");
-    if (style === null) return;
+  const handleSelectLink = (link) => {
+    setSelectedLink(link);
+    setLinkPanelOpen(true);
+  };
+
+  const handleSaveLink = async (changes) => {
+    if (!selectedLink) return;
     try {
-      const { data } = await api.patch(`/links/${link.id}`, { label, style: style === "dashed" ? "dashed" : "solid" });
+      const { data } = await api.patch(`/links/${selectedLink.id}`, changes);
       setRoadmap((rm) => ({ ...rm, links: rm.links.map((l) => l.id === data.id ? data : l) }));
+      setSelectedLink(data);
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
+  const handleDeleteSelectedLink = async () => {
+    if (!selectedLink || !window.confirm("Delete this link?")) return;
+    try {
+      await api.delete(`/links/${selectedLink.id}`);
+      setRoadmap((rm) => ({ ...rm, links: rm.links.filter((l) => l.id !== selectedLink.id) }));
+      setLinkPanelOpen(false);
+      setSelectedLink(null);
     } catch (e) { alert(formatApiError(e)); }
   };
 
@@ -211,9 +231,17 @@ export default function RoadmapDetail() {
           onCreateLink={handleCreateLink}
           onDeleteLink={handleDeleteLink}
           onSelectLink={handleSelectLink}
-          onAddBlock={handleAddBlock}
+          onAddBlockAt={handleAddBlockAt}
         />
       </div>
+
+      <LinkSidePanel
+        open={linkPanelOpen}
+        onOpenChange={setLinkPanelOpen}
+        link={selectedLink}
+        onSave={handleSaveLink}
+        onDelete={handleDeleteSelectedLink}
+      />
 
       <BlockSidePanel
         open={panelOpen}

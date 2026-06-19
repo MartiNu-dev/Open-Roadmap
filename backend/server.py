@@ -265,6 +265,10 @@ def create_link(
         to_block_id=payload.to_block_id,
         style=payload.style,
         label=payload.label,
+        color=payload.color,
+        thickness=payload.thickness,
+        from_side=payload.from_side,
+        to_side=payload.to_side,
     )
     db.add(link)
     db.commit()

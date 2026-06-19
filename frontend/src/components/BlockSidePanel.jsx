@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,19 +28,34 @@ export default function BlockSidePanel({
   canManage, onSave, onDelete, saving,
 }) {
   const [form, setForm] = useState(null);
+  const initialBlockIdRef = useRef(null);
 
   useEffect(() => {
     if (block) {
+      initialBlockIdRef.current = block.id;
       setForm({
         title: block.title,
         short_description: block.short_description || "",
         detailed_content: block.detailed_content || "",
-        level: block.level || "beginner",
+        level: block.level || "",
         estimated_duration: block.estimated_duration || "",
         node_style: block.node_style || "primary",
       });
     }
   }, [block?.id]);
+
+  // Auto-save on edits (debounced) — only when in manage mode
+  useEffect(() => {
+    if (!form || !block || !canManage) return;
+    if (initialBlockIdRef.current !== block.id) return;
+    const changed = (form.title !== block.title) || (form.short_description !== (block.short_description || ""))
+      || (form.detailed_content !== (block.detailed_content || "")) || (form.level !== (block.level || ""))
+      || (form.estimated_duration !== (block.estimated_duration || "")) || (form.node_style !== (block.node_style || "primary"));
+    if (!changed) return;
+    if (!form.title || !form.title.trim()) return;
+    const t = setTimeout(() => onSave?.(form), 500);
+    return () => clearTimeout(t);
+  }, [form, canManage]);
 
   if (!block || !form) return null;
   const status = progress?.status || "not_started";
@@ -103,12 +118,10 @@ export default function BlockSidePanel({
                   {STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
-              <div className="flex gap-2 pt-2">
-                <Button onClick={() => onSave?.(form)} disabled={saving} data-testid="edit-block-save-btn">
-                  <Save size={14} className="mr-1" /> {saving ? "Saving…" : "Save changes"}
-                </Button>
-                <Button variant="outline" onClick={onDelete} data-testid="edit-block-delete-btn">
-                  <Trash2 size={14} className="mr-1 text-red-600" /> Delete
+              <div className="flex gap-2 pt-2 items-center">
+                <span className="text-xs text-slate-500 italic">{saving ? "Saving…" : "Auto-saves as you type"}</span>
+                <Button variant="outline" onClick={onDelete} data-testid="edit-block-delete-btn" className="ml-auto">
+                  <Trash2 size={14} className="mr-1 text-red-600" /> Delete block
                 </Button>
               </div>
             </div>

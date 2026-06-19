@@ -114,6 +114,10 @@ class RoadmapLink(Base):
     roadmap_id = Column(String, ForeignKey("roadmaps.id", ondelete="CASCADE"), nullable=False, index=True)
     from_block_id = Column(String, ForeignKey("roadmap_blocks.id", ondelete="CASCADE"), nullable=False)
     to_block_id = Column(String, ForeignKey("roadmap_blocks.id", ondelete="CASCADE"), nullable=False)
-    style = Column(String, nullable=False, default="solid")  # solid | dashed
+    style = Column(String, nullable=False, default="solid")  # solid | dashed | dotted
     label = Column(String, nullable=False, default="")
+    color = Column(String, nullable=False, default="#475569")
+    thickness = Column(String, nullable=False, default="medium")  # small | medium | large
+    from_side = Column(String, nullable=False, default="bottom")  # top | right | bottom | left
+    to_side = Column(String, nullable=False, default="top")
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)

@@ -14,7 +14,13 @@ def run_migrations(engine: Engine) -> None:
         "node_style": "VARCHAR NOT NULL DEFAULT 'primary'",
     }
     link_cols = {c["name"] for c in insp.get_columns("roadmap_links")} if "roadmap_links" in insp.get_table_names() else set()
-    link_needed = {"label": "VARCHAR NOT NULL DEFAULT ''"}
+    link_needed = {
+        "label": "VARCHAR NOT NULL DEFAULT ''",
+        "color": "VARCHAR NOT NULL DEFAULT '#475569'",
+        "thickness": "VARCHAR NOT NULL DEFAULT 'medium'",
+        "from_side": "VARCHAR NOT NULL DEFAULT 'bottom'",
+        "to_side": "VARCHAR NOT NULL DEFAULT 'top'",
+    }
     with engine.begin() as conn:
         for name, ddl in needed.items():
             if name not in cols:
