@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +99,7 @@ export default function BlockSidePanel({
               <div>
                 <Label>Detailed content</Label>
                 <Textarea rows={5} value={form.detailed_content} onChange={(e) => setField("detailed_content", e.target.value)} data-testid="edit-block-detail" />
+                <p className="text-xs text-slate-500 mt-1">Supports <span className="font-mono">Markdown</span> — headings, **bold**, lists, [links](url), `code`, tables…</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -130,7 +133,9 @@ export default function BlockSidePanel({
               {block.detailed_content && (
                 <div>
                   <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">Overview</h4>
-                  <p className="text-slate-700 leading-relaxed text-[15px]">{block.detailed_content}</p>
+                  <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed" data-testid="block-content-markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.detailed_content}</ReactMarkdown>
+                  </div>
                 </div>
               )}
               {block.resources?.length > 0 && (
