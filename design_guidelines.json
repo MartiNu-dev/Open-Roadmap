@@ -1,0 +1,100 @@
+{
+  "project_name": "Learning Roadmap Platform",
+  "theme": "Light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "design_philosophy": {
+    "core_principles": [
+      "Content is king: Focus entirely on structured data and readability.",
+      "Generous Spacing: High signal-to-noise ratio using whitespace.",
+      "Clear Status Indication: Functional colors communicate progression."
+    ]
+  },
+  "typography": {
+    "fonts": {
+      "headings": "Outfit, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-bold tracking-tight",
+      "h2": "text-2xl sm:text-3xl font-semibold tracking-tight",
+      "h3": "text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm text-slate-500"
+    }
+  },
+  "color_palette": {
+    "background": {
+      "page": "#FFFFFF",
+      "surface": "#F8FAFC",
+      "panel": "#FFFFFF"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "muted": "#94A3B8"
+    },
+    "border": {
+      "default": "#E2E8F0",
+      "strong": "#CBD5E1"
+    },
+    "status": {
+      "not_started": {
+        "color": "#94A3B8",
+        "bg": "#F8FAFC",
+        "border": "#E2E8F0"
+      },
+      "in_progress": {
+        "color": "#3B82F6",
+        "bg": "#EFF6FF",
+        "border": "#3B82F6"
+      },
+      "completed": {
+        "color": "#10B981",
+        "bg": "#ECFDF5",
+        "border": "#10B981"
+      }
+    },
+    "primary": "#0F172A"
+  },
+  "layout_and_spacing": {
+    "general": "Use max-w-5xl mx-auto for main container. p-6 to p-12 for sections.",
+    "roadmap_view": {
+      "desktop": "Flex container with gap-12. Left side (flex-1) for timeline, right side is w-[400px] sticky aside for block details.",
+      "mobile": "Single column. Side panel becomes a full-screen Sheet (Shadcn)."
+    },
+    "vertical_timeline": {
+      "structure": "Relative container with absolute vertical line (w-px bg-slate-200) down the left side (e.g., left-6).",
+      "node": "Flex row, items-start, gap-6 relative z-10. Left item is the status dot/icon placed over the line. Right item is the content card.",
+      "card": "Border-2 rounded-md p-4 transition-all hover:-translate-y-1 hover:shadow-md cursor-pointer bg-white."
+    }
+  },
+  "components": {
+    "timeline_card": "HTML/Tailwind custom component. Not standard Shadcn Card. Use rigid borders. Dynamic border colors based on status.",
+    "side_panel": "Shadcn Sheet or fixed Sticky sidebar. Contains Block Title, Description, 'Detailed Content' (prose), 'Resources' list, and a sticky bottom section for 'Mark Status' buttons.",
+    "progress_header": "Sticky top bar with Roadmap Title and a Shadcn Progress bar reflecting (completed_blocks / total_blocks) * 100.",
+    "badges": "Shadcn Badge. Flat design (no extreme rounded-full unless for dots).",
+    "buttons": "Shadcn Button. Square or slightly rounded (rounded-md). High contrast."
+  },
+  "motion": {
+    "interactions": "Fast and snappy. transition-all duration-200 ease-in-out for cards.",
+    "page_load": "Subtle fade-in for timeline nodes."
+  },
+  "testing": {
+    "required_attributes": [
+      "data-testid='roadmap-timeline'",
+      "data-testid='block-node-{id}'",
+      "data-testid='side-panel'",
+      "data-testid='status-btn-complete'",
+      "data-testid='progress-bar'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Do NOT use 'Inter' for headings. Use Outfit.",
+    "Use IBM Plex Sans for body text to give a technical, structured feel.",
+    "Implement the vertical timeline using pure Tailwind CSS and pseudo-elements or absolute divs for the connecting lines.",
+    "Ensure status changes instantly reflect in the UI by changing the border color and icon of the timeline node (Gray=Not Started, Blue=In Progress, Green=Completed).",
+    "Install and use 'lucide-react' or '@phosphor-icons/react' for clean iconography inside timeline nodes.",
+    "No AI-slop purple gradients. Stick to the stark, minimal, high-contrast Swiss archetype."
+  ]
+}
