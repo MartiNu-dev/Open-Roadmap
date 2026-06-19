@@ -15,6 +15,16 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 - Schema: User, Roadmap, RoadmapBlock, BlockResource, UserProgress (unique on user_id+block_id)
 - Auth: Bearer JWT (7 day expiry) + dependency-injected `get_current_user`, `require_roles(...)`
 
+## Phase 3 — DONE (2026-02): Admin User Management + Roadmap CRUD
+- [x] Backend admin user mgmt: `GET /api/admin/users`, `PATCH /api/admin/users/{id}/role`, `DELETE /api/admin/users/{id}` (admin-only)
+- [x] Self-protection: admin cannot demote or delete themselves (400)
+- [x] Backend roadmap CRUD: `GET /api/admin/roadmaps` (editor/admin, includes drafts/archived), `POST /api/roadmaps`, `PUT /api/roadmaps/{id}`, `PATCH /api/roadmaps/{id}/status` (editor/admin), `DELETE /api/roadmaps/{id}` (admin-only)
+- [x] Slug validation: regex `^[a-z0-9-]+$`, uniqueness enforced (409)
+- [x] Status workflow: draft/archived roadmaps hidden from public GET /api/roadmaps; published visible
+- [x] Frontend `/admin/users` (admin-only) with role select + delete, self-row disabled
+- [x] Frontend `/admin/roadmaps` (editor+admin): list with status badges, create via Dialog, change status via select, delete (admin only)
+- [x] Navbar shows conditional links: "Manage roadmaps" (editor/admin), "Users" (admin only)
+
 ## Phase 2 — DONE (2026-02): 2D Canvas Editor + Viewer
 - [x] Schema: `RoadmapBlock` extended with x/y/width/height/node_style; new `RoadmapLink` table
 - [x] Lightweight SQLite migration (`/app/backend/migrations.py`) — adds columns to existing DB on startup
