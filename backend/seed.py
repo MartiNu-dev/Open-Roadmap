@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from auth import hash_password
-from models import User, Roadmap, RoadmapBlock, BlockResource, UserProgress
+from models import User, Roadmap, RoadmapBlock, BlockResource, UserProgress, RoadmapLink
 
 
 ROADMAPS = [
@@ -66,6 +66,36 @@ ROADMAPS = [
         ],
     },
 ]
+
+
+def _zigzag_position(idx: int) -> tuple[int, int, str]:
+    """Place blocks alternately left/center/right with vertical spacing."""
+    column = idx % 3  # 0 left, 1 center, 2 right
+    row = idx // 3
+    x_by_col = {0: 80, 1: 360, 2: 640}
+    style = "primary" if column == 1 else "alternative"
+    return x_by_col[column], 80 + row * 160, style
+
+
+def _backfill_layout(db: Session) -> None:
+    """Set positions/styles + sequential links for blocks/roadmaps that lack them."""
+    roadmaps = db.query(Roadmap).all()
+    for rm in roadmaps:
+        blocks = sorted(rm.blocks, key=lambda b: b.order_index)
+        needs_layout = any(b.x == 0 and b.y == 0 for b in blocks)
+        if needs_layout:
+            for i, b in enumerate(blocks):
+                x, y, style = _zigzag_position(i)
+                b.x, b.y, b.width, b.height = x, y, 220, 64
+                if not b.node_style or b.node_style == "primary":
+                    b.node_style = style if i > 0 else "primary"
+        existing_links = db.query(RoadmapLink).filter(RoadmapLink.roadmap_id == rm.id).count()
+        if existing_links == 0 and len(blocks) > 1:
+            for a, c in zip(blocks, blocks[1:]):
+                db.add(RoadmapLink(
+                    roadmap_id=rm.id, from_block_id=a.id, to_block_id=c.id, style="solid",
+                ))
+    db.flush()
 
 
 def _ensure_user(db: Session, email: str, password: str, name: str, role: str) -> User:
@@ -141,4 +171,5 @@ def seed_all(db: Session) -> None:
                         status="in_progress", started_at=now,
                     ))
 
+    _backfill_layout(db)
     db.commit()

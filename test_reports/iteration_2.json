@@ -1,0 +1,28 @@
+{
+  "summary": "Phase 2 (2D canvas) tested end-to-end. Backend canvas APIs (position PATCH, block CRUD, link create/delete) all enforce auth/role correctly (401 unauth, 403 user, 200 editor). Validation rules (self-link 400, cross-roadmap link 400) work. GET /api/roadmaps/frontend returns 11 blocks with x/y/width/height/node_style fields plus top-level 'links' array of 10 sequential links. Frontend canvas renders correctly in viewer mode for logged-out and user@example.com (6 completed badges with green check marks on /roadmaps/frontend). Editor mode for editor@example.com renders toolbar + block-editor-form with all 6 expected fields, save persists across reload, delete via confirm dialog removes block. Role gating works: toggle-edit-mode-btn absent for logged-out and user, present for editor.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "GET /api/roadmaps/frontend returns 11 blocks with x,y,width,height,node_style and links[] of 10",
+    "PATCH /api/blocks/{id}/position: 401 unauth, 403 user, 200 editor (verified x=999,y=888 persisted)",
+    "POST /api/roadmaps/{id}/blocks: 401 unauth, 403 user, 201 editor (TEST_BLOCK created)",
+    "PUT /api/blocks/{id}: 403 user, 200 editor (title updated)",
+    "DELETE /api/blocks/{id}: 401 unauth, 403 user, 204 editor",
+    "POST /api/roadmaps/{id}/links: 401 unauth, 403 user, 201 editor",
+    "DELETE /api/links/{id}: 403 user, 204 editor",
+    "Validation: self-link returns 400 'Cannot link a block to itself'",
+    "Validation: cross-roadmap link returns 400 'Block does not belong to roadmap'",
+    "Canvas renders with data-testid='roadmap-canvas', SVG canvas-links with 10 <path>, 11 canvas-block-* elements (logged-out /roadmaps/devops)",
+    "User@example.com on /roadmaps/frontend: 6 block-status-completed badges visible with green check marks (matches backend progress data)",
+    "Block click opens side-panel; status-btn-complete updates status (visible green ring after close)",
+    "Editor toggle-edit-mode-btn shows editor-toolbar; clicking block opens block-editor-form with all 6 fields (title/short/detail/level/duration/style)",
+    "Editor: title edit persists across reload (EDITED_TITLE visible)",
+    "Editor: delete block via confirm dialog removes from canvas",
+    "Role gating: toggle-edit-mode-btn absent for logged-out and user, present for editor"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Initial first-pass DOM query for completed badges returned 0 due to timing (page not fully loaded after login redirect). Retest with adequate wait confirmed 6 badges rendered correctly. Test credentials present at /app/memory/test_credentials.md."
+}

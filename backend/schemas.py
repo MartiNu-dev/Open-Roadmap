@@ -54,7 +54,47 @@ class BlockOut(BaseModel):
     level: str
     estimated_duration: str
     order_index: int
+    x: int
+    y: int
+    width: int
+    height: int
+    node_style: str
     resources: List[ResourceOut] = []
+
+
+class LinkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    roadmap_id: str
+    from_block_id: str
+    to_block_id: str
+    style: str
+
+
+class BlockPositionIn(BaseModel):
+    x: int
+    y: int
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+
+class BlockUpsertIn(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    short_description: str = ""
+    detailed_content: str = ""
+    level: str = "beginner"
+    estimated_duration: str = ""
+    node_style: str = "primary"
+    x: int = 0
+    y: int = 0
+    width: int = 200
+    height: int = 64
+
+
+class LinkCreateIn(BaseModel):
+    from_block_id: str
+    to_block_id: str
+    style: str = "solid"
 
 
 class RoadmapSummary(BaseModel):
@@ -77,6 +117,7 @@ class RoadmapDetail(BaseModel):
     status: str
     cover_emoji: str
     blocks: List[BlockOut]
+    links: List[LinkOut] = []
 
 
 # ---------- Progress ----------

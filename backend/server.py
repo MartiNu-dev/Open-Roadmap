@@ -13,15 +13,21 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import Base, engine, get_db
-from models import Roadmap, RoadmapBlock, User, UserProgress
+from migrations import run_migrations
+from models import Roadmap, RoadmapBlock, RoadmapLink, User, UserProgress
 from auth import (
     create_access_token,
     get_current_user,
     hash_password,
+    require_roles,
     verify_password,
 )
 from schemas import (
     BlockOut,
+    BlockPositionIn,
+    BlockUpsertIn,
+    LinkCreateIn,
+    LinkOut,
     LoginIn,
     ProgressOut,
     ProgressUpsertIn,
@@ -44,6 +50,7 @@ api = APIRouter(prefix="/api")
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine)
     from database import SessionLocal
     db = SessionLocal()
     try:
@@ -130,12 +137,148 @@ def get_roadmap(slug_or_id: str, db: Session = Depends(get_db)):
     if roadmap is None or roadmap.status != "published":
         raise HTTPException(status_code=404, detail="Roadmap not found")
     blocks = sorted(roadmap.blocks, key=lambda b: b.order_index)
+    links = db.query(RoadmapLink).filter(RoadmapLink.roadmap_id == roadmap.id).all()
     return RoadmapDetail(
         id=roadmap.id, slug=roadmap.slug, title=roadmap.title,
         description=roadmap.description, status=roadmap.status,
         cover_emoji=roadmap.cover_emoji,
         blocks=[BlockOut.model_validate(b) for b in blocks],
+        links=[LinkOut.model_validate(l) for l in links],
     )
+
+
+# --------------- CANVAS EDITOR (editor + admin only) ---------------
+EDITOR_ROLES = ("admin", "editor")
+
+
+@api.patch("/blocks/{block_id}/position", response_model=BlockOut)
+def update_block_position(
+    block_id: str,
+    payload: BlockPositionIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    block = db.query(RoadmapBlock).filter(RoadmapBlock.id == block_id).first()
+    if block is None:
+        raise HTTPException(status_code=404, detail="Block not found")
+    block.x = payload.x
+    block.y = payload.y
+    if payload.width is not None:
+        block.width = payload.width
+    if payload.height is not None:
+        block.height = payload.height
+    db.commit()
+    db.refresh(block)
+    return BlockOut.model_validate(block)
+
+
+@api.put("/blocks/{block_id}", response_model=BlockOut)
+def update_block_details(
+    block_id: str,
+    payload: BlockUpsertIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    block = db.query(RoadmapBlock).filter(RoadmapBlock.id == block_id).first()
+    if block is None:
+        raise HTTPException(status_code=404, detail="Block not found")
+    for field in ("title", "short_description", "detailed_content", "level",
+                  "estimated_duration", "node_style", "x", "y", "width", "height"):
+        setattr(block, field, getattr(payload, field))
+    db.commit()
+    db.refresh(block)
+    return BlockOut.model_validate(block)
+
+
+@api.post("/roadmaps/{roadmap_id}/blocks", response_model=BlockOut, status_code=201)
+def create_block(
+    roadmap_id: str,
+    payload: BlockUpsertIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    roadmap = db.query(Roadmap).filter(
+        (Roadmap.id == roadmap_id) | (Roadmap.slug == roadmap_id)
+    ).first()
+    if roadmap is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    max_order = db.query(func.max(RoadmapBlock.order_index)).filter(
+        RoadmapBlock.roadmap_id == roadmap.id
+    ).scalar()
+    block = RoadmapBlock(
+        roadmap_id=roadmap.id,
+        title=payload.title,
+        short_description=payload.short_description,
+        detailed_content=payload.detailed_content,
+        level=payload.level,
+        estimated_duration=payload.estimated_duration,
+        node_style=payload.node_style,
+        x=payload.x, y=payload.y, width=payload.width, height=payload.height,
+        order_index=(max_order or 0) + 1,
+    )
+    db.add(block)
+    db.commit()
+    db.refresh(block)
+    return BlockOut.model_validate(block)
+
+
+@api.delete("/blocks/{block_id}", status_code=204)
+def delete_block(
+    block_id: str,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    block = db.query(RoadmapBlock).filter(RoadmapBlock.id == block_id).first()
+    if block is None:
+        raise HTTPException(status_code=404, detail="Block not found")
+    db.delete(block)
+    db.commit()
+    return None
+
+
+@api.post("/roadmaps/{roadmap_id}/links", response_model=LinkOut, status_code=201)
+def create_link(
+    roadmap_id: str,
+    payload: LinkCreateIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    roadmap = db.query(Roadmap).filter(
+        (Roadmap.id == roadmap_id) | (Roadmap.slug == roadmap_id)
+    ).first()
+    if roadmap is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    if payload.from_block_id == payload.to_block_id:
+        raise HTTPException(status_code=400, detail="Cannot link a block to itself")
+    for bid in (payload.from_block_id, payload.to_block_id):
+        b = db.query(RoadmapBlock).filter(RoadmapBlock.id == bid).first()
+        if b is None or b.roadmap_id != roadmap.id:
+            raise HTTPException(status_code=400, detail="Block does not belong to roadmap")
+    link = RoadmapLink(
+        roadmap_id=roadmap.id,
+        from_block_id=payload.from_block_id,
+        to_block_id=payload.to_block_id,
+        style=payload.style,
+    )
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    return LinkOut.model_validate(link)
+
+
+@api.delete("/links/{link_id}", status_code=204)
+def delete_link(
+    link_id: str,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    link = db.query(RoadmapLink).filter(RoadmapLink.id == link_id).first()
+    if link is None:
+        raise HTTPException(status_code=404, detail="Link not found")
+    db.delete(link)
+    db.commit()
+    return None
+
 
 
 # --------------- PROGRESS ---------------

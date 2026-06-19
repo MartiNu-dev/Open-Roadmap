@@ -57,6 +57,12 @@ class RoadmapBlock(Base):
     level = Column(String, nullable=False, default="beginner")  # beginner | intermediate | advanced
     estimated_duration = Column(String, nullable=False, default="")
     order_index = Column(Integer, nullable=False, default=0)
+    # Canvas layout
+    x = Column(Integer, nullable=False, default=0)
+    y = Column(Integer, nullable=False, default=0)
+    width = Column(Integer, nullable=False, default=200)
+    height = Column(Integer, nullable=False, default=64)
+    node_style = Column(String, nullable=False, default="primary")  # primary | alternative | optional | label
 
     roadmap = relationship("Roadmap", back_populates="blocks")
     resources = relationship(
@@ -100,3 +106,13 @@ class UserProgress(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "block_id", name="uq_progress_user_block"),
     )
+
+
+class RoadmapLink(Base):
+    __tablename__ = "roadmap_links"
+    id = Column(String, primary_key=True, default=_uuid)
+    roadmap_id = Column(String, ForeignKey("roadmaps.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_block_id = Column(String, ForeignKey("roadmap_blocks.id", ondelete="CASCADE"), nullable=False)
+    to_block_id = Column(String, ForeignKey("roadmap_blocks.id", ondelete="CASCADE"), nullable=False)
+    style = Column(String, nullable=False, default="solid")  # solid | dashed
+    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
