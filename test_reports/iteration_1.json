@@ -1,0 +1,26 @@
+{
+  "summary": "First-finish smoke test of roadmap.sh-style learning platform. Backend (FastAPI + SQLite + JWT) and frontend (React) integration verified end-to-end. All targeted endpoints and the primary UI flow pass.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "GET /api/roadmaps returns 3 published roadmaps (frontend, backend, devops) each with block_count=11",
+    "GET /api/roadmaps/frontend returns roadmap detail with 11 blocks ordered by order_index, each with 2 resources",
+    "POST /api/auth/login with user@example.com/user123 returns access_token; wrong password -> 401",
+    "GET /api/auth/me with Bearer returns user object; without header -> 401",
+    "POST /api/auth/register creates new user with role=user and returns access_token (201)",
+    "POST /api/auth/logout with Bearer returns {ok:true}",
+    "GET /api/progress/me/frontend as user@example.com returns total_blocks=11, completed_blocks=3, in_progress_blocks=1, percent_complete=27",
+    "GET /api/progress/me/frontend as admin@example.com returns total_blocks=11, completed_blocks=0 (admin only sees own progress - authorization isolated correctly)",
+    "POST /api/progress upserts entry for current user only; summary updated to 4/11 (36%)",
+    "POST /api/progress without token -> 401",
+    "Home page loads with 3 featured roadmap cards (data-testid: home-roadmap-card-frontend/backend/devops)",
+    "Login flow via /login (login-email-input, login-password-input, login-submit-btn) redirects to /dashboard",
+    "Roadmap detail page (/roadmaps/frontend) renders vertical timeline with 11 blocks; logged-in user sees correct progress (4/11, 36%, 1 in progress) with green completed dots & spinner for in-progress block - matches backend state"
+  ],
+  "failed": [],
+  "action_items": [
+    "Optional: confirm side-panel testid behavior with full QA agent; initial click-through into /roadmaps/<slug>/<block?> open path works as evidenced by screenshot"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}
