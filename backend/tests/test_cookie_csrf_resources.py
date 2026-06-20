@@ -6,9 +6,18 @@ import pytest
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://learning-blocks-1.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN = {"email": "admin@example.com", "password": "admin123"}
-EDITOR = {"email": "editor@example.com", "password": "editor123"}
-USER = {"email": "user@example.com", "password": "user123"}
+ADMIN = {
+    "email": os.environ.get("ADMIN_EMAIL", "admin@example.com"),
+    "password": os.environ.get("ADMIN_PASSWORD", "admin123"),
+}
+EDITOR = {
+    "email": os.environ.get("SEED_EDITOR_EMAIL", "editor@example.com"),
+    "password": os.environ.get("SEED_EDITOR_PASSWORD", "editor123"),
+}
+USER = {
+    "email": os.environ.get("SEED_USER_EMAIL", "user@example.com"),
+    "password": os.environ.get("SEED_USER_PASSWORD", "user123"),
+}
 
 
 def _login(creds):
