@@ -162,6 +162,47 @@ export default function RoadmapDetail() {
     } catch (e) { alert(formatApiError(e)); }
   };
 
+  const handleAddResource = async (blockId) => {
+    try {
+      const { data } = await api.post(`/blocks/${blockId}/resources`, {
+        label: "New resource", url: "https://", kind: "article",
+      });
+      setRoadmap((rm) => ({
+        ...rm,
+        blocks: rm.blocks.map((b) =>
+          b.id === blockId ? { ...b, resources: [...(b.resources || []), data] } : b
+        ),
+      }));
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
+  const handleUpdateResource = async (resourceId, changes) => {
+    try {
+      const { data } = await api.patch(`/resources/${resourceId}`, changes);
+      setRoadmap((rm) => ({
+        ...rm,
+        blocks: rm.blocks.map((b) => ({
+          ...b,
+          resources: (b.resources || []).map((r) => (r.id === data.id ? data : r)),
+        })),
+      }));
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
+  const handleDeleteResource = async (resourceId) => {
+    if (!window.confirm("Delete this resource?")) return;
+    try {
+      await api.delete(`/resources/${resourceId}`);
+      setRoadmap((rm) => ({
+        ...rm,
+        blocks: rm.blocks.map((b) => ({
+          ...b,
+          resources: (b.resources || []).filter((r) => r.id !== resourceId),
+        })),
+      }));
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
   if (!roadmap) {
     return (
       <div className="min-h-screen bg-white">
@@ -256,6 +297,9 @@ export default function RoadmapDetail() {
         onSave={handleSaveBlock}
         onDelete={handleDeleteBlock}
         saving={editing}
+        onAddResource={handleAddResource}
+        onUpdateResource={handleUpdateResource}
+        onDeleteResource={handleDeleteResource}
       />
     </div>
   );

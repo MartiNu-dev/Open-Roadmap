@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Circle, Loader2, Check, ExternalLink, BookOpen, Video, FileText, Trash2, Save } from "lucide-react";
+import { Circle, Loader2, Check, ExternalLink, BookOpen, Video, FileText, Trash2, Plus } from "lucide-react";
 
 const STATUS_LABEL = {
   not_started: "Not started",
@@ -17,6 +17,7 @@ const STATUS_LABEL = {
 };
 
 const RES_ICON = { article: FileText, video: Video, docs: BookOpen, course: BookOpen };
+const RES_KINDS = ["article", "video", "docs", "course"];
 
 const STYLE_OPTIONS = [
   { value: "primary", label: "Primary (yellow)" },
@@ -27,9 +28,79 @@ const STYLE_OPTIONS = [
 
 const LEVEL_OPTIONS = ["", "beginner", "intermediate", "advanced"];
 
+function ResourceRow({ resource, onUpdate, onDelete }) {
+  const [draft, setDraft] = useState({
+    label: resource.label,
+    url: resource.url,
+    kind: resource.kind,
+  });
+  const initialRef = useRef(resource.id);
+
+  // Re-sync when a different resource is shown in the same slot
+  useEffect(() => {
+    if (initialRef.current !== resource.id) {
+      initialRef.current = resource.id;
+      setDraft({ label: resource.label, url: resource.url, kind: resource.kind });
+    }
+  }, [resource.id, resource.label, resource.url, resource.kind]);
+
+  // Debounced auto-save when fields change
+  useEffect(() => {
+    const changed =
+      draft.label !== resource.label ||
+      draft.url !== resource.url ||
+      draft.kind !== resource.kind;
+    if (!changed) return;
+    if (!draft.label.trim() || !draft.url.trim()) return;
+    const t = setTimeout(() => {
+      onUpdate(resource.id, draft);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [draft, resource.id, resource.label, resource.url, resource.kind, onUpdate]);
+
+  return (
+    <div className="border border-slate-200 rounded-md p-3 space-y-2" data-testid={`resource-row-${resource.id}`}>
+      <div className="flex gap-2">
+        <Input
+          value={draft.label}
+          placeholder="Label"
+          onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
+          data-testid={`resource-label-${resource.id}`}
+        />
+        <select
+          className="h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+          value={draft.kind}
+          onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value }))}
+          data-testid={`resource-kind-${resource.id}`}
+        >
+          {RES_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={draft.url}
+          placeholder="https://…"
+          onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
+          data-testid={`resource-url-${resource.id}`}
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onDelete(resource.id)}
+          data-testid={`resource-delete-${resource.id}`}
+          title="Delete resource"
+        >
+          <Trash2 size={14} className="text-red-600" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function BlockSidePanel({
   open, onOpenChange, block, progress, onStatusChange, canEdit,
   canManage, onSave, onDelete, saving,
+  onAddResource, onUpdateResource, onDeleteResource,
 }) {
   const [form, setForm] = useState(null);
   const initialBlockIdRef = useRef(null);
@@ -89,47 +160,77 @@ export default function BlockSidePanel({
 
         <div className="flex-1 p-6 space-y-8">
           {canManage ? (
-            <div className="space-y-4" data-testid="block-editor-form">
-              <div>
-                <Label>Title</Label>
-                <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-block-title" />
-              </div>
-              <div>
-                <Label>Short description</Label>
-                <Input value={form.short_description} onChange={(e) => setField("short_description", e.target.value)} data-testid="edit-block-short" />
-              </div>
-              <div>
-                <Label>Detailed content</Label>
-                <Textarea rows={5} value={form.detailed_content} onChange={(e) => setField("detailed_content", e.target.value)} data-testid="edit-block-detail" />
-                <p className="text-xs text-slate-500 mt-1">Supports <span className="font-mono">Markdown</span> — headings, **bold**, lists, [links](url), `code`, tables…</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+            <>
+              <div className="space-y-4" data-testid="block-editor-form">
                 <div>
-                  <Label>Level</Label>
+                  <Label>Title</Label>
+                  <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-block-title" />
+                </div>
+                <div>
+                  <Label>Short description</Label>
+                  <Input value={form.short_description} onChange={(e) => setField("short_description", e.target.value)} data-testid="edit-block-short" />
+                </div>
+                <div>
+                  <Label>Detailed content</Label>
+                  <Textarea rows={5} value={form.detailed_content} onChange={(e) => setField("detailed_content", e.target.value)} data-testid="edit-block-detail" />
+                  <p className="text-xs text-slate-500 mt-1">Supports <span className="font-mono">Markdown</span> — headings, **bold**, lists, [links](url), `code`, tables…</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Level</Label>
+                    <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                      value={form.level} onChange={(e) => setField("level", e.target.value)} data-testid="edit-block-level">
+                      {LEVEL_OPTIONS.map((l) => <option key={l || "none"} value={l}>{l || "— none —"}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Duration</Label>
+                    <Input value={form.estimated_duration} onChange={(e) => setField("estimated_duration", e.target.value)} placeholder="e.g. 4h" data-testid="edit-block-duration" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Block style</Label>
                   <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
-                    value={form.level} onChange={(e) => setField("level", e.target.value)} data-testid="edit-block-level">
-                    {LEVEL_OPTIONS.map((l) => <option key={l || "none"} value={l}>{l || "— none —"}</option>)}
+                    value={form.node_style} onChange={(e) => setField("node_style", e.target.value)} data-testid="edit-block-style">
+                    {STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
-                <div>
-                  <Label>Duration</Label>
-                  <Input value={form.estimated_duration} onChange={(e) => setField("estimated_duration", e.target.value)} placeholder="e.g. 4h" data-testid="edit-block-duration" />
+                <div className="flex gap-2 pt-2 items-center">
+                  <span className="text-xs text-slate-500 italic">{saving ? "Saving…" : "Auto-saves as you type"}</span>
+                  <Button variant="outline" onClick={onDelete} data-testid="edit-block-delete-btn" className="ml-auto">
+                    <Trash2 size={14} className="mr-1 text-red-600" /> Delete block
+                  </Button>
                 </div>
               </div>
-              <div>
-                <Label>Block style</Label>
-                <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
-                  value={form.node_style} onChange={(e) => setField("node_style", e.target.value)} data-testid="edit-block-style">
-                  {STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+
+              <div className="space-y-3" data-testid="block-editor-resources">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500">Resources</h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onAddResource?.(block.id)}
+                    data-testid="resource-add-btn"
+                  >
+                    <Plus size={14} className="mr-1" /> Add
+                  </Button>
+                </div>
+                {(block.resources?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-slate-500 italic">No resources yet. Add links to docs, articles, videos or courses.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {block.resources.map((r) => (
+                      <ResourceRow
+                        key={r.id}
+                        resource={r}
+                        onUpdate={onUpdateResource}
+                        onDelete={onDeleteResource}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2 pt-2 items-center">
-                <span className="text-xs text-slate-500 italic">{saving ? "Saving…" : "Auto-saves as you type"}</span>
-                <Button variant="outline" onClick={onDelete} data-testid="edit-block-delete-btn" className="ml-auto">
-                  <Trash2 size={14} className="mr-1 text-red-600" /> Delete block
-                </Button>
-              </div>
-            </div>
+            </>
           ) : (
             <>
               {block.detailed_content && (

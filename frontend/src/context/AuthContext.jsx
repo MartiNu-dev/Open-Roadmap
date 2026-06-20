@@ -8,18 +8,13 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const refreshMe = useCallback(async () => {
-    const token = localStorage.getItem("rm_token");
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
     try {
       const { data } = await api.get("/auth/me");
       setUser(data);
     } catch (err) {
-      console.error("auth/me failed:", err);
-      localStorage.removeItem("rm_token");
+      if (err?.response?.status !== 401) {
+        console.error("auth/me failed:", err);
+      }
       setUser(null);
     } finally {
       setLoading(false);
@@ -31,7 +26,6 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     try {
       const { data } = await api.post("/auth/login", { email, password });
-      localStorage.setItem("rm_token", data.access_token);
       setUser(data.user);
       return { ok: true };
     } catch (err) {
@@ -43,7 +37,6 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (email, name, password) => {
     try {
       const { data } = await api.post("/auth/register", { email, name, password });
-      localStorage.setItem("rm_token", data.access_token);
       setUser(data.user);
       return { ok: true };
     } catch (err) {
@@ -55,7 +48,6 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout"); }
     catch (err) { console.error("logout request failed (ignored):", err); }
-    localStorage.removeItem("rm_token");
     setUser(null);
   }, []);
 

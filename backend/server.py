@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from database import Base, engine, get_db
 from migrations import run_migrations
-from models import Roadmap, RoadmapBlock, RoadmapLink, User, UserProgress
+from models import BlockResource, Roadmap, RoadmapBlock, RoadmapLink, User, UserProgress
 from auth import (
     create_access_token,
     get_current_user,
@@ -34,6 +34,9 @@ from schemas import (
     ProgressOut,
     ProgressUpsertIn,
     RegisterIn,
+    ResourceCreateIn,
+    ResourceOut,
+    ResourceUpdateIn,
     RoadmapCreateIn,
     RoadmapDetail,
     RoadmapProgressSummary,
@@ -258,6 +261,67 @@ def delete_block(
     if block is None:
         raise HTTPException(status_code=404, detail="Block not found")
     db.delete(block)
+    db.commit()
+    return None
+
+
+# --------------- BLOCK RESOURCES (editor + admin) ---------------
+@api.post("/blocks/{block_id}/resources", response_model=ResourceOut, status_code=201)
+def create_resource(
+    block_id: str,
+    payload: ResourceCreateIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    block = db.query(RoadmapBlock).filter(RoadmapBlock.id == block_id).first()
+    if block is None:
+        raise HTTPException(status_code=404, detail="Block not found")
+    max_order = db.query(func.max(BlockResource.order_index)).filter(
+        BlockResource.block_id == block_id
+    ).scalar()
+    res = BlockResource(
+        block_id=block_id,
+        label=payload.label.strip(),
+        url=payload.url.strip(),
+        kind=payload.kind,
+        order_index=(max_order or 0) + 1,
+    )
+    db.add(res)
+    db.commit()
+    db.refresh(res)
+    return ResourceOut.model_validate(res)
+
+
+@api.patch("/resources/{resource_id}", response_model=ResourceOut)
+def update_resource(
+    resource_id: str,
+    payload: ResourceUpdateIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    res = db.query(BlockResource).filter(BlockResource.id == resource_id).first()
+    if res is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        if isinstance(v, str):
+            v = v.strip()
+        setattr(res, k, v)
+    db.commit()
+    db.refresh(res)
+    return ResourceOut.model_validate(res)
+
+
+@api.delete("/resources/{resource_id}", status_code=204)
+def delete_resource(
+    resource_id: str,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    res = db.query(BlockResource).filter(BlockResource.id == resource_id).first()
+    if res is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    db.delete(res)
     db.commit()
     return None
 

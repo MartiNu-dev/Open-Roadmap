@@ -35,6 +35,9 @@ class TokenOut(BaseModel):
 
 
 # ---------- Roadmaps ----------
+RES_KIND = Literal["article", "video", "docs", "course"]
+
+
 class ResourceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -42,6 +45,19 @@ class ResourceOut(BaseModel):
     url: str
     kind: str
     order_index: int
+
+
+class ResourceCreateIn(BaseModel):
+    label: str = Field(min_length=1, max_length=200)
+    url: str = Field(min_length=1, max_length=1000)
+    kind: RES_KIND = "article"
+
+
+class ResourceUpdateIn(BaseModel):
+    label: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    url: Optional[str] = Field(default=None, min_length=1, max_length=1000)
+    kind: Optional[RES_KIND] = None
+    order_index: Optional[int] = None
 
 
 class BlockOut(BaseModel):
