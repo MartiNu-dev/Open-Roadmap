@@ -15,6 +15,15 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 - Schema: User, Roadmap, RoadmapBlock, BlockResource, UserProgress (unique on user_id+block_id)
 - Auth: Bearer JWT (7 day expiry) + dependency-injected `get_current_user`, `require_roles(...)`
 
+## Phase 8 — DONE (2026-02): Canvas groups + snap-to-grid + resize handles
+- [x] **Group canvas object** — `RoadmapBlock.kind ∈ {block, group}` + `bg_color`, `label_position` (top|bottom), `label_align` (left|center|right). Idempotent SQLite migration. Side-panel `group-editor-form` with 8 preset color swatches + native color picker + position/alignment selects, auto-saved.
+- [x] Groups render BEHIND blocks (z=0 vs z=1), share existing side-anchor link API → can be linked to/from any block.
+- [x] Toolbar `Add group` button + context-menu `ctx-add-group` (right-click empty canvas).
+- [x] **Snap-to-grid (SHIFT)** — holding SHIFT during drag-move or drag-resize snaps both x/y/w/h to the 24px grid (matches the dotted bg pattern). Verified `left%24===0 && top%24===0`.
+- [x] **Corner resize handles** — 4 corner bullets per block/group (nw/ne/sw/se) with `nwse-resize`/`nesw-resize` cursor. Resizing from nw/n/w corners anchors the opposite corner. PATCH `/blocks/{id}/position` now accepts width+height. Min 80x36.
+- [x] **Smaller default block height** — new blocks default to 220x44 (was 200x64). Configurable via the existing PUT /blocks endpoint (height column was already present).
+- [x] Tests: `/app/backend/tests/test_phase8_groups_resize.py` (9 new cases) + prior 30 → 39/39 backend pass. Frontend smoke confirmed (groups, resize, SHIFT snap on both axes, smaller default height).
+
 ## Phase 7 — DONE (2026-02): Filter & search roadmaps by tag/level
 - [x] Schema: `Roadmap.tags` (TEXT, comma-separated lowercase) + `Roadmap.level` (beginner|intermediate|advanced|mixed); idempotent SQLite migration
 - [x] Backend: `GET /api/roadmaps?q=&tag=&level=` (case-insensitive title/description search; boundary-safe tag match; `level=all` sentinel); `GET /api/tags` (sorted unique tags from published roadmaps)
