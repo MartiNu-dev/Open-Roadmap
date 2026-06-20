@@ -3,11 +3,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import secrets
 import logging
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -68,9 +69,27 @@ def on_startup() -> None:
         db.close()
 
 
+COOKIE_NAME = "access_token"
+CSRF_COOKIE = "csrf_token"
+COOKIE_KW = dict(httponly=True, samesite="lax", secure=False, path="/")
+CSRF_COOKIE_KW = dict(httponly=False, samesite="lax", secure=False, path="/")
+
+
+def _set_auth_cookies(response: Response, token: str) -> str:
+    csrf = secrets.token_urlsafe(24)
+    response.set_cookie(COOKIE_NAME, token, max_age=60 * 60 * 24 * 7, **COOKIE_KW)
+    response.set_cookie(CSRF_COOKIE, csrf, max_age=60 * 60 * 24 * 7, **CSRF_COOKIE_KW)
+    return csrf
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/")
+
+
 # --------------- AUTH ---------------
 @api.post("/auth/register", response_model=TokenOut, status_code=201)
-def register(payload: RegisterIn, db: Session = Depends(get_db)):
+def register(payload: RegisterIn, response: Response, db: Session = Depends(get_db)):
     email = payload.email.lower().strip()
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -84,22 +103,24 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     token = create_access_token(user.id, user.email, user.role)
+    _set_auth_cookies(response, token)
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
 @api.post("/auth/login", response_model=TokenOut)
-def login(payload: LoginIn, db: Session = Depends(get_db)):
+def login(payload: LoginIn, response: Response, db: Session = Depends(get_db)):
     email = payload.email.lower().strip()
     user = db.query(User).filter(User.email == email).first()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(user.id, user.email, user.role)
+    _set_auth_cookies(response, token)
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
 @api.post("/auth/logout")
-def logout(current: User = Depends(get_current_user)):
-    # Token is stateless; client must discard. Endpoint exists for symmetry.
+def logout(response: Response, current: User = Depends(get_current_user)):
+    _clear_auth_cookies(response)
     return {"ok": True}
 
 
@@ -537,10 +558,30 @@ def root():
 
 app.include_router(api)
 
+_CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+_CSRF_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register"}
+
+
+@app.middleware("http")
+async def csrf_protect(request: Request, call_next):
+    if request.method in _CSRF_SAFE_METHODS or request.url.path in _CSRF_EXEMPT_PATHS:
+        return await call_next(request)
+    # If client uses Bearer auth, skip CSRF (no cookie to abuse). Cookie auth → enforce double-submit.
+    if request.headers.get("authorization", "").lower().startswith("bearer "):
+        return await call_next(request)
+    cookie_token = request.cookies.get(CSRF_COOKIE)
+    header_token = request.headers.get("x-csrf-token")
+    if cookie_token and (not header_token or header_token != cookie_token):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": "CSRF token missing or invalid"}, status_code=403)
+    return await call_next(request)
+
+
+_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
-    allow_credentials=True,
+    allow_origins=_origins or ["*"],
+    allow_credentials=bool(_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
