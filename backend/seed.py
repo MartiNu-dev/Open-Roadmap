@@ -13,6 +13,8 @@ ROADMAPS = [
         "title": "Frontend Developer",
         "description": "A step-by-step guide to becoming a modern frontend developer in 2026.",
         "cover_emoji": "🎨",
+        "tags": "web,react,css,javascript",
+        "level": "mixed",
         "blocks": [
             ("Internet Fundamentals", "How the web works", "Learn how HTTP, DNS, browsers and hosting work together to deliver web pages.", "beginner", "3h"),
             ("HTML Essentials", "Semantic markup", "Master semantic HTML: structure, forms, accessibility roles and SEO basics.", "beginner", "6h"),
@@ -32,6 +34,8 @@ ROADMAPS = [
         "title": "Backend Developer",
         "description": "Master server-side development, APIs, databases and distributed systems.",
         "cover_emoji": "⚙️",
+        "tags": "api,databases,python,distributed-systems",
+        "level": "mixed",
         "blocks": [
             ("Choose a Language", "Python, Node, Go...", "Compare ecosystems and pick a primary backend language.", "beginner", "2h"),
             ("OS & Terminal Basics", "Linux fluency", "Shell, processes, permissions and package management.", "beginner", "5h"),
@@ -51,6 +55,8 @@ ROADMAPS = [
         "title": "DevOps & Cloud",
         "description": "Bridge development and operations with automation, infrastructure-as-code and reliable delivery.",
         "cover_emoji": "🚀",
+        "tags": "cloud,devops,kubernetes,terraform",
+        "level": "advanced",
         "blocks": [
             ("Linux Fundamentals", "Your daily driver", "File system, processes, systemd, networking and shell scripting.", "beginner", "8h"),
             ("Networking Basics", "TCP/IP, DNS, TLS", "OSI model, routing, load balancing and the TLS handshake.", "beginner", "6h"),
@@ -120,6 +126,18 @@ def seed_all(db: Session) -> None:
     user = _ensure_user(db, user_email, user_password, "Standard User", "user")
     _ = (admin, editor)
 
+    # Backfill tags/level on already-seeded roadmaps so the new filter UI has data
+    seed_meta_by_slug = {rm["slug"]: (rm.get("tags", ""), rm.get("level", "mixed")) for rm in ROADMAPS}
+    for slug, (tags, level) in seed_meta_by_slug.items():
+        existing = db.query(Roadmap).filter(Roadmap.slug == slug).first()
+        if not existing:
+            continue
+        if not (existing.tags or "") and tags:
+            existing.tags = tags
+        # only overwrite if the existing value is the migration default "mixed" and our seed has something more specific
+        if (existing.level in (None, "", "mixed")) and level and level != "mixed":
+            existing.level = level
+
     if db.query(Roadmap).count() == 0:
         for rm in ROADMAPS:
             roadmap = Roadmap(
@@ -128,6 +146,8 @@ def seed_all(db: Session) -> None:
                 description=rm["description"],
                 cover_emoji=rm["cover_emoji"],
                 status="published",
+                tags=rm.get("tags", ""),
+                level=rm.get("level", "mixed"),
             )
             db.add(roadmap)
             db.flush()

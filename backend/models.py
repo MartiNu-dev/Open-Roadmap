@@ -36,6 +36,8 @@ class Roadmap(Base):
     description = Column(Text, nullable=False, default="")
     status = Column(String, nullable=False, default="published")  # draft | published | archived
     cover_emoji = Column(String, nullable=False, default="🗺️")
+    tags = Column(Text, nullable=False, default="")  # comma-separated, lowercase
+    level = Column(String, nullable=False, default="mixed")  # beginner|intermediate|advanced|mixed
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, nullable=False)
 

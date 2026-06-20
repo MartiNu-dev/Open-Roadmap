@@ -21,6 +21,11 @@ def run_migrations(engine: Engine) -> None:
         "from_side": "VARCHAR NOT NULL DEFAULT 'bottom'",
         "to_side": "VARCHAR NOT NULL DEFAULT 'top'",
     }
+    rm_cols = {c["name"] for c in insp.get_columns("roadmaps")} if "roadmaps" in insp.get_table_names() else set()
+    rm_needed = {
+        "tags": "TEXT NOT NULL DEFAULT ''",
+        "level": "VARCHAR NOT NULL DEFAULT 'mixed'",
+    }
     with engine.begin() as conn:
         for name, ddl in needed.items():
             if name not in cols:
@@ -28,3 +33,6 @@ def run_migrations(engine: Engine) -> None:
         for name, ddl in link_needed.items():
             if link_cols and name not in link_cols:
                 conn.execute(text(f"ALTER TABLE roadmap_links ADD COLUMN {name} {ddl}"))
+        for name, ddl in rm_needed.items():
+            if rm_cols and name not in rm_cols:
+                conn.execute(text(f"ALTER TABLE roadmaps ADD COLUMN {name} {ddl}"))

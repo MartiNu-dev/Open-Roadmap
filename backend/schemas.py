@@ -137,12 +137,17 @@ class RoleUpdateIn(BaseModel):
     role: Role
 
 
+RoadmapLevel = Literal["beginner", "intermediate", "advanced", "mixed"]
+
+
 class RoadmapCreateIn(BaseModel):
     slug: str = Field(min_length=2, max_length=60, pattern=r"^[a-z0-9-]+$")
     title: str = Field(min_length=1, max_length=120)
     description: str = ""
     cover_emoji: str = "🗺️"
     status: Literal["draft", "published", "archived"] = "draft"
+    tags: str = ""  # comma-separated, normalized server-side
+    level: RoadmapLevel = "mixed"
 
 
 class RoadmapUpdateIn(BaseModel):
@@ -150,6 +155,8 @@ class RoadmapUpdateIn(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=120)
     description: Optional[str] = None
     cover_emoji: Optional[str] = None
+    tags: Optional[str] = None
+    level: Optional[RoadmapLevel] = None
 
 
 class RoadmapStatusIn(BaseModel):
@@ -164,6 +171,8 @@ class RoadmapSummary(BaseModel):
     description: str
     status: str
     cover_emoji: str
+    tags: str = ""
+    level: str = "mixed"
     block_count: int = 0
 
 
@@ -175,6 +184,8 @@ class RoadmapDetail(BaseModel):
     description: str
     status: str
     cover_emoji: str
+    tags: str = ""
+    level: str = "mixed"
     blocks: List[BlockOut]
     links: List[LinkOut] = []
 

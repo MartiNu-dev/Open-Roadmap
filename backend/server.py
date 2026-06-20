@@ -6,7 +6,7 @@ import os
 import secrets
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -133,26 +133,69 @@ def me(current: User = Depends(get_current_user)):
 
 
 # --------------- ROADMAPS ---------------
+def _normalize_tags(raw: str) -> str:
+    if not raw:
+        return ""
+    seen, out = set(), []
+    for t in raw.split(","):
+        t = t.strip().lower()
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return ",".join(out)
+
+
+def _summary_from(r: Roadmap, block_count: int) -> RoadmapSummary:
+    return RoadmapSummary(
+        id=r.id, slug=r.slug, title=r.title, description=r.description,
+        status=r.status, cover_emoji=r.cover_emoji,
+        tags=r.tags or "", level=r.level or "mixed",
+        block_count=int(block_count),
+    )
+
+
 @api.get("/roadmaps", response_model=List[RoadmapSummary])
-def list_roadmaps(db: Session = Depends(get_db)):
-    rows = (
-        db.query(
-            Roadmap,
-            func.count(RoadmapBlock.id).label("block_count"),
-        )
+def list_roadmaps(
+    q: Optional[str] = None,
+    tag: Optional[str] = None,
+    level: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(Roadmap, func.count(RoadmapBlock.id).label("block_count"))
         .outerjoin(RoadmapBlock, RoadmapBlock.roadmap_id == Roadmap.id)
         .filter(Roadmap.status == "published")
-        .group_by(Roadmap.id)
-        .order_by(Roadmap.created_at.asc())
-        .all()
     )
-    return [
-        RoadmapSummary(
-            id=r.id, slug=r.slug, title=r.title, description=r.description,
-            status=r.status, cover_emoji=r.cover_emoji, block_count=int(count),
+    if q:
+        like = f"%{q.lower().strip()}%"
+        query = query.filter(
+            func.lower(Roadmap.title).like(like) | func.lower(Roadmap.description).like(like)
         )
-        for r, count in rows
-    ]
+    if tag:
+        t = tag.strip().lower()
+        # tags are comma-separated; match boundary to avoid "react" matching "react-native"
+        query = query.filter(
+            (func.lower(Roadmap.tags) == t)
+            | func.lower(Roadmap.tags).like(f"{t},%")
+            | func.lower(Roadmap.tags).like(f"%,{t},%")
+            | func.lower(Roadmap.tags).like(f"%,{t}")
+        )
+    if level and level != "all":
+        query = query.filter(Roadmap.level == level)
+    rows = query.group_by(Roadmap.id).order_by(Roadmap.created_at.asc()).all()
+    return [_summary_from(r, count) for r, count in rows]
+
+
+@api.get("/tags", response_model=List[str])
+def list_tags(db: Session = Depends(get_db)):
+    rows = db.query(Roadmap.tags).filter(Roadmap.status == "published", Roadmap.tags != "").all()
+    bag = set()
+    for (raw,) in rows:
+        for t in (raw or "").split(","):
+            t = t.strip().lower()
+            if t:
+                bag.add(t)
+    return sorted(bag)
 
 
 @api.get("/roadmaps/{slug_or_id}", response_model=RoadmapDetail)
@@ -171,6 +214,7 @@ def get_roadmap(slug_or_id: str, db: Session = Depends(get_db)):
         id=roadmap.id, slug=roadmap.slug, title=roadmap.title,
         description=roadmap.description, status=roadmap.status,
         cover_emoji=roadmap.cover_emoji,
+        tags=roadmap.tags or "", level=roadmap.level or "mixed",
         blocks=[BlockOut.model_validate(b) for b in blocks],
         links=[LinkOut.model_validate(l) for l in links],
     )
@@ -406,13 +450,7 @@ def list_all_roadmaps(
         .order_by(Roadmap.created_at.asc())
         .all()
     )
-    return [
-        RoadmapSummary(
-            id=r.id, slug=r.slug, title=r.title, description=r.description,
-            status=r.status, cover_emoji=r.cover_emoji, block_count=int(count),
-        )
-        for r, count in rows
-    ]
+    return [_summary_from(r, count) for r, count in rows]
 
 
 @api.post("/roadmaps", response_model=RoadmapSummary, status_code=201)
@@ -426,12 +464,10 @@ def create_roadmap(
     rm = Roadmap(
         slug=payload.slug, title=payload.title, description=payload.description,
         cover_emoji=payload.cover_emoji, status=payload.status,
+        tags=_normalize_tags(payload.tags), level=payload.level,
     )
     db.add(rm); db.commit(); db.refresh(rm)
-    return RoadmapSummary(
-        id=rm.id, slug=rm.slug, title=rm.title, description=rm.description,
-        status=rm.status, cover_emoji=rm.cover_emoji, block_count=0,
-    )
+    return _summary_from(rm, 0)
 
 
 @api.put("/roadmaps/{roadmap_id}", response_model=RoadmapSummary)
@@ -448,14 +484,13 @@ def update_roadmap(
     if "slug" in data and data["slug"] != rm.slug:
         if db.query(Roadmap).filter(Roadmap.slug == data["slug"]).first():
             raise HTTPException(status_code=409, detail="Slug already in use")
+    if "tags" in data and data["tags"] is not None:
+        data["tags"] = _normalize_tags(data["tags"])
     for k, v in data.items():
         setattr(rm, k, v)
     db.commit(); db.refresh(rm)
     block_count = db.query(func.count(RoadmapBlock.id)).filter(RoadmapBlock.roadmap_id == rm.id).scalar() or 0
-    return RoadmapSummary(
-        id=rm.id, slug=rm.slug, title=rm.title, description=rm.description,
-        status=rm.status, cover_emoji=rm.cover_emoji, block_count=int(block_count),
-    )
+    return _summary_from(rm, block_count)
 
 
 @api.patch("/roadmaps/{roadmap_id}/status", response_model=RoadmapSummary)
@@ -471,10 +506,7 @@ def set_roadmap_status(
     rm.status = payload.status
     db.commit(); db.refresh(rm)
     block_count = db.query(func.count(RoadmapBlock.id)).filter(RoadmapBlock.roadmap_id == rm.id).scalar() or 0
-    return RoadmapSummary(
-        id=rm.id, slug=rm.slug, title=rm.title, description=rm.description,
-        status=rm.status, cover_emoji=rm.cover_emoji, block_count=int(block_count),
-    )
+    return _summary_from(rm, block_count)
 
 
 @api.delete("/roadmaps/{roadmap_id}", status_code=204)
