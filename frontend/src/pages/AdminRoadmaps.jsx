@@ -146,7 +146,7 @@ export default function AdminRoadmaps() {
                 </div>
                 <div>
                   <Label>Slug (a-z, 0-9, dash)</Label>
-                  <Input value={form.slug} onChange={(e) => setField("slug", e.target.value.toLowerCase())} required pattern="^[a-z0-9-]+$" data-testid="new-roadmap-slug" />
+                  <Input value={form.slug} onChange={(e) => setField("slug", e.target.value.toLowerCase())} required pattern="^[-a-z0-9]+$" data-testid="new-roadmap-slug" />
                 </div>
                 <div>
                   <Label>Title</Label>

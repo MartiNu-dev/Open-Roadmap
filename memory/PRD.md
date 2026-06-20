@@ -15,6 +15,15 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 - Schema: User, Roadmap, RoadmapBlock, BlockResource, UserProgress (unique on user_id+block_id)
 - Auth: Bearer JWT (7 day expiry) + dependency-injected `get_current_user`, `require_roles(...)`
 
+## Phase 7 — DONE (2026-02): Filter & search roadmaps by tag/level
+- [x] Schema: `Roadmap.tags` (TEXT, comma-separated lowercase) + `Roadmap.level` (beginner|intermediate|advanced|mixed); idempotent SQLite migration
+- [x] Backend: `GET /api/roadmaps?q=&tag=&level=` (case-insensitive title/description search; boundary-safe tag match; `level=all` sentinel); `GET /api/tags` (sorted unique tags from published roadmaps)
+- [x] `_normalize_tags` server-side: lowercase, trim, dedupe, comma-join. `_summary_from` helper consolidates response building.
+- [x] Seed backfill: frontend/backend keep `mixed`, devops set to `advanced`; tag bag populated.
+- [x] Frontend `/roadmaps`: search input + level select + tag chip bag + Clear; empty state; level badge + tag preview on each card. 200ms debounced fetch.
+- [x] Frontend `/admin/roadmaps`: per-row `MetaEditor` auto-saves tags+level (500ms); new-roadmap dialog has tags+level fields.
+- [x] Tests: `/app/backend/tests/test_filter_search.py` (13 cases) + prior 17 cases → 30/30 backend + 9/9 frontend pass.
+
 ## Phase 6 — DONE (2026-02): Cookie+CSRF auth + Resources CRUD
 - [x] Auth migrated from Bearer/localStorage to **httpOnly cookies + double-submit CSRF**
       Backend: `_set_auth_cookies` + `csrf_protect` middleware; login/register CSRF-exempt; Bearer still accepted for backward compat
@@ -91,7 +100,7 @@ P0
 P1
 - [ ] User profile page (change name, password)
 - [ ] Notes editor on progress entries
-- [ ] Filter/search roadmaps by tag/level
+- [x] Filter/search roadmaps by tag/level *(Phase 7)*
 P2
 - [ ] Roadmap tagging system
 - [ ] Public profile pages
