@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, Loader2, Plus, Square } from "lucide-react";
 
 const NODE_STYLES = {
   primary: "bg-yellow-100 border-slate-900 text-slate-900",
@@ -24,9 +24,12 @@ const ANCHOR_POS = {
   bottom: (p) => ({ x: p.x + p.width / 2, y: p.y + p.height }),
   left: (p) => ({ x: p.x, y: p.y + p.height / 2 }),
 };
+const GRID = 24;
+const snap = (v) => Math.round(v / GRID) * GRID;
+
+const RESIZE_CURSOR = { nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize" };
 
 function curvedPath(a, b, fromSide = "bottom", toSide = "top") {
-  // Use perpendicular control points based on which side each anchor is on
   const off = Math.max(40, Math.min(120, Math.hypot(b.x - a.x, b.y - a.y) / 2));
   const dir = (side) => ({ top: [0, -off], bottom: [0, off], left: [-off, 0], right: [off, 0] }[side]);
   const [c1x, c1y] = dir(fromSide); const [c2x, c2y] = dir(toSide);
@@ -39,13 +42,82 @@ function StatusBadge({ status }) {
   return null;
 }
 
+function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseDown, onResizeMouseDown, onClick, onContextMenu, suppressClickRef }) {
+  const labelTop = block.label_position === "top";
+  const align = block.label_align || "center";
+  const alignCls = align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center";
+  const labelStyle = { color: "#fff" };
+  return (
+    <div
+      data-block-id={block.id}
+      data-block-kind="group"
+      data-testid={`canvas-group-${block.id}`}
+      className={`absolute select-none group ${editMode && isEditor ? "cursor-move" : "cursor-pointer"}`}
+      style={{ left: block.x, top: block.y, width: block.width, height: block.height, zIndex: 0 }}
+      onMouseDown={(e) => onMouseDownGroup(e, block)}
+      onClick={() => { if (!suppressClickRef.current) onClick?.(block); }}
+      onContextMenu={(e) => { e.preventDefault(); if (!suppressClickRef.current) onClick?.(block); }}
+    >
+      <div
+        className="relative w-full h-full rounded-md flex flex-col"
+        style={{ background: block.bg_color || "#0f172a" }}
+      >
+        {block.title && labelTop && (
+          <div className={`px-3 py-1 text-xs font-mono uppercase tracking-wider ${alignCls}`} style={labelStyle}>{block.title}</div>
+        )}
+        <div className="flex-1" />
+        {block.title && !labelTop && (
+          <div className={`px-3 py-1 text-xs font-mono uppercase tracking-wider ${alignCls}`} style={labelStyle}>{block.title}</div>
+        )}
+      </div>
+      {isEditor && editMode && (
+        <>
+          {["top", "right", "bottom", "left"].map((side) => {
+            const pos = {
+              top: { left: "50%", top: -8, marginLeft: -8 },
+              right: { right: -8, top: "50%", marginTop: -8 },
+              bottom: { left: "50%", bottom: -8, marginLeft: -8 },
+              left: { left: -8, top: "50%", marginTop: -8 },
+            }[side];
+            return (
+              <div key={side} data-no-drag data-anchor-side={side}
+                data-testid={`anchor-${side}-${block.id}`}
+                className="absolute w-4 h-4 rounded-full bg-blue-500 border-2 border-white opacity-0 group-hover:opacity-100 hover:scale-125 transition cursor-crosshair shadow"
+                style={pos}
+                onMouseDown={(e) => onAnchorMouseDown(e, block, side)}
+              />
+            );
+          })}
+          {["nw", "ne", "sw", "se"].map((corner) => {
+            const pos = {
+              nw: { left: -6, top: -6 },
+              ne: { right: -6, top: -6 },
+              sw: { left: -6, bottom: -6 },
+              se: { right: -6, bottom: -6 },
+            }[corner];
+            return (
+              <div key={corner} data-no-drag data-resize-corner={corner}
+                data-testid={`resize-${corner}-${block.id}`}
+                className="absolute w-3 h-3 rounded-sm bg-white border-2 border-slate-900 opacity-0 group-hover:opacity-100 hover:scale-125 transition shadow"
+                style={{ ...pos, cursor: RESIZE_CURSOR[corner] }}
+                onMouseDown={(e) => onResizeMouseDown(e, block, corner)}
+              />
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function RoadmapCanvas({
   roadmap, progressByBlock, isEditor, editMode,
-  onSelectBlock, onMoveBlock, onCreateLink, onDeleteLink, onSelectLink, onAddBlockAt,
+  onSelectBlock, onMoveBlock, onCreateLink, onDeleteLink, onSelectLink,
+  onAddBlockAt, onAddGroupAt, onResizeBlock,
 }) {
   const [positions, setPositions] = useState({});
   const [pendingLink, setPendingLink] = useState(null);
-  const [menu, setMenu] = useState(null); // {x, y}
+  const [menu, setMenu] = useState(null); // {clientX, clientY, canvas}
   const draggingRef = useRef(null);
   const suppressClickRef = useRef(false);
   const wrapRef = useRef(null);
@@ -88,13 +160,41 @@ export default function RoadmapCanvas({
     setPendingLink({ from: ANCHOR_POS[side](p), cursor: canvasPoint(e) });
   };
 
+  const onResizeMouseDown = (e, block, corner) => {
+    if (!isEditor || !editMode) return;
+    e.preventDefault(); e.stopPropagation();
+    const p = positions[block.id] || block;
+    draggingRef.current = {
+      kind: "resize", id: block.id, corner,
+      startX: e.clientX, startY: e.clientY,
+      initialX: p.x, initialY: p.y, initialW: p.width, initialH: p.height,
+      moved: false,
+    };
+  };
+
   useEffect(() => {
     function onMove(e) {
       const d = draggingRef.current; if (!d) return;
       if (d.kind === "block") {
+        let dx = e.clientX - d.startX, dy = e.clientY - d.startY;
+        if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
+        let nx = Math.max(0, d.initialX + dx);
+        let ny = Math.max(0, d.initialY + dy);
+        if (e.shiftKey) { nx = snap(nx); ny = snap(ny); }
+        setPositions((prev) => ({ ...prev, [d.id]: { ...prev[d.id], x: nx, y: ny } }));
+      } else if (d.kind === "resize") {
         const dx = e.clientX - d.startX, dy = e.clientY - d.startY;
         if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
-        setPositions((prev) => ({ ...prev, [d.id]: { ...prev[d.id], x: Math.max(0, d.initialX + dx), y: Math.max(0, d.initialY + dy) } }));
+        let nx = d.initialX, ny = d.initialY, nw = d.initialW, nh = d.initialH;
+        const MIN_W = 80, MIN_H = 36;
+        if (d.corner.includes("e")) nw = Math.max(MIN_W, d.initialW + dx);
+        if (d.corner.includes("s")) nh = Math.max(MIN_H, d.initialH + dy);
+        if (d.corner.includes("w")) { nw = Math.max(MIN_W, d.initialW - dx); nx = d.initialX + (d.initialW - nw); }
+        if (d.corner.includes("n")) { nh = Math.max(MIN_H, d.initialH - dy); ny = d.initialY + (d.initialH - nh); }
+        if (e.shiftKey) {
+          nx = snap(nx); ny = snap(ny); nw = Math.max(MIN_W, snap(nw)); nh = Math.max(MIN_H, snap(nh));
+        }
+        setPositions((prev) => ({ ...prev, [d.id]: { x: nx, y: ny, width: nw, height: nh } }));
       } else if (d.kind === "link") {
         setPendingLink((pl) => pl ? { ...pl, cursor: canvasPoint(e) } : null);
       }
@@ -107,6 +207,13 @@ export default function RoadmapCanvas({
           suppressClickRef.current = true;
           setTimeout(() => { suppressClickRef.current = false; }, 100);
           if (onMoveBlock) { const p = positions[d.id]; if (p) await onMoveBlock(d.id, p.x, p.y); }
+        }
+      } else if (d.kind === "resize") {
+        if (d.moved) {
+          suppressClickRef.current = true;
+          setTimeout(() => { suppressClickRef.current = false; }, 100);
+          const p = positions[d.id];
+          if (p && onResizeBlock) await onResizeBlock(d.id, p.x, p.y, p.width, p.height);
         }
       } else if (d.kind === "link") {
         const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -123,7 +230,7 @@ export default function RoadmapCanvas({
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-  }, [positions, onMoveBlock, onCreateLink]);
+  }, [positions, onMoveBlock, onCreateLink, onResizeBlock]);
 
   if (!roadmap) return null;
 
@@ -131,7 +238,7 @@ export default function RoadmapCanvas({
     if (!isEditor || !editMode) return;
     if (e.target.closest("[data-block-id]")) return;
     const p = canvasPoint(e);
-    onAddBlockAt?.(p.x - 110, p.y - 32);
+    onAddBlockAt?.(p.x - 110, p.y - 22);
   };
 
   const handleCanvasContextMenu = (e) => {
@@ -141,6 +248,10 @@ export default function RoadmapCanvas({
     setMenu({ clientX: e.clientX, clientY: e.clientY, canvas: canvasPoint(e) });
   };
 
+  // Render groups first (lower z-index) so blocks sit on top
+  const groups = (roadmap.blocks || []).filter((b) => b.kind === "group");
+  const blocks = (roadmap.blocks || []).filter((b) => b.kind !== "group");
+
   return (
     <div className="relative" onClick={() => setMenu(null)}>
       {isEditor && editMode && (
@@ -149,7 +260,10 @@ export default function RoadmapCanvas({
           <button onClick={() => onAddBlockAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-block-btn">
             <Plus size={14} /> Add block
           </button>
-          <span className="text-slate-400 text-xs">double-click or right-click empty area to add · drag side handles to link</span>
+          <button onClick={() => onAddGroupAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-group-btn">
+            <Square size={14} /> Add group
+          </button>
+          <span className="text-slate-400 text-xs">double-click empty area · drag side handles to link · drag corners to resize · hold SHIFT to snap to grid</span>
         </div>
       )}
 
@@ -161,7 +275,7 @@ export default function RoadmapCanvas({
         onContextMenu={handleCanvasContextMenu}
       >
         <div className="relative" style={{ width: bounds.width, height: bounds.height }}>
-          <svg className="absolute inset-0 pointer-events-none" width={bounds.width} height={bounds.height} data-testid="canvas-links">
+          <svg className="absolute inset-0 pointer-events-none" width={bounds.width} height={bounds.height} data-testid="canvas-links" style={{ zIndex: 2 }}>
             {(roadmap.links || []).map((link) => {
               const a = positions[link.from_block_id], b = positions[link.to_block_id];
               if (!a || !b) return null;
@@ -172,10 +286,9 @@ export default function RoadmapCanvas({
               const sw = THICKNESS[link.thickness] || 2.5;
               const dash = DASH[link.style] || "";
               return (
-                <g key={link.id} className={isEditor && editMode ? "pointer-events-auto" : "pointer-events-auto"}>
-                  {/* invisible wider hit area */}
+                <g key={link.id}>
                   <path d={curvedPath(start, end, fs, ts)} stroke="transparent" strokeWidth={14} fill="none"
-                    className="cursor-pointer"
+                    className="cursor-pointer pointer-events-auto"
                     onClick={(e) => { e.stopPropagation(); onSelectLink?.(link); }}
                     onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onSelectLink?.(link); }}
                   />
@@ -187,7 +300,7 @@ export default function RoadmapCanvas({
                     </g>
                   )}
                   {isEditor && editMode && (
-                    <g onClick={(e) => { e.stopPropagation(); onDeleteLink?.(link.id); }} className="cursor-pointer">
+                    <g onClick={(e) => { e.stopPropagation(); onDeleteLink?.(link.id); }} className="cursor-pointer pointer-events-auto">
                       <circle cx={mid.x + 18} cy={mid.y - 14} r="9" fill="white" stroke="#ef4444" />
                       <text x={mid.x + 18} y={mid.y - 10} textAnchor="middle" fontSize="12" fill="#ef4444">×</text>
                     </g>
@@ -200,7 +313,28 @@ export default function RoadmapCanvas({
             )}
           </svg>
 
-          {roadmap.blocks.map((block) => {
+          {/* Groups (z=0) — rendered first, behind blocks */}
+          {groups.map((block) => {
+            const p = positions[block.id] || block;
+            const merged = { ...block, x: p.x, y: p.y, width: p.width, height: p.height };
+            return (
+              <GroupNode
+                key={block.id}
+                block={merged}
+                isEditor={isEditor}
+                editMode={editMode}
+                onMouseDownGroup={onMouseDownBlock}
+                onAnchorMouseDown={onAnchorMouseDown}
+                onResizeMouseDown={onResizeMouseDown}
+                onClick={onSelectBlock}
+                onContextMenu={onSelectBlock}
+                suppressClickRef={suppressClickRef}
+              />
+            );
+          })}
+
+          {/* Blocks (z=1) on top of groups */}
+          {blocks.map((block) => {
             const p = positions[block.id] || block;
             const styleCls = NODE_STYLES[block.node_style] || NODE_STYLES.primary;
             const status = progressByBlock?.[block.id]?.status || "not_started";
@@ -209,11 +343,12 @@ export default function RoadmapCanvas({
               <div
                 key={block.id}
                 data-block-id={block.id}
+                data-block-kind="block"
                 data-testid={`canvas-block-${block.id}`}
                 className={`absolute select-none group ${editMode && isEditor ? "cursor-move" : "cursor-pointer"}`}
-                style={{ left: p.x, top: p.y, width: p.width, height: p.height }}
+                style={{ left: p.x, top: p.y, width: p.width, height: p.height, zIndex: 1 }}
                 onMouseDown={(e) => onMouseDownBlock(e, block)}
-                onClick={(e) => {
+                onClick={() => {
                   if (suppressClickRef.current) return;
                   onSelectBlock?.(block);
                 }}
@@ -242,6 +377,22 @@ export default function RoadmapCanvas({
                     />
                   );
                 })}
+                {isEditor && editMode && ["nw","ne","sw","se"].map((corner) => {
+                  const pos = {
+                    nw: { left: -6, top: -6 },
+                    ne: { right: -6, top: -6 },
+                    sw: { left: -6, bottom: -6 },
+                    se: { right: -6, bottom: -6 },
+                  }[corner];
+                  return (
+                    <div key={corner} data-no-drag data-resize-corner={corner}
+                      data-testid={`resize-${corner}-${block.id}`}
+                      className="absolute w-3 h-3 rounded-sm bg-white border-2 border-slate-900 opacity-0 group-hover:opacity-100 hover:scale-125 transition shadow"
+                      style={{ ...pos, cursor: RESIZE_CURSOR[corner] }}
+                      onMouseDown={(e) => onResizeMouseDown(e, block, corner)}
+                    />
+                  );
+                })}
               </div>
             );
           })}
@@ -258,14 +409,19 @@ export default function RoadmapCanvas({
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
             data-testid="ctx-add-block"
-            onClick={() => { onAddBlockAt?.(menu.canvas.x - 110, menu.canvas.y - 32); setMenu(null); }}
+            onClick={() => { onAddBlockAt?.(menu.canvas.x - 110, menu.canvas.y - 22); setMenu(null); }}
           >+ Add block here</button>
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
+            data-testid="ctx-add-group"
+            onClick={() => { onAddGroupAt?.(menu.canvas.x - 160, menu.canvas.y - 90); setMenu(null); }}
+          >+ Add group here</button>
         </div>
       )}
 
       {isEditor && editMode && (
         <div className="mt-2 text-xs text-slate-500 font-mono">
-          Tip: drag side handles to link · click or right-click any link to edit its style, color, thickness, label and sides.
+          Tip: drag side handles to link · drag corners to resize · hold SHIFT to snap to the 24px grid.
         </div>
       )}
     </div>

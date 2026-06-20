@@ -75,6 +75,10 @@ class BlockOut(BaseModel):
     width: int
     height: int
     node_style: str
+    kind: str = "block"
+    bg_color: str = "#0f172a"
+    label_position: str = "bottom"
+    label_align: str = "center"
     resources: List[ResourceOut] = []
 
 
@@ -108,8 +112,12 @@ class BlockUpsertIn(BaseModel):
     node_style: str = "primary"
     x: int = 0
     y: int = 0
-    width: int = 200
-    height: int = 64
+    width: int = 220
+    height: int = 44
+    kind: Literal["block", "group"] = "block"
+    bg_color: str = "#0f172a"
+    label_position: Literal["top", "bottom"] = "bottom"
+    label_align: Literal["left", "center", "right"] = "center"
 
 
 class LinkCreateIn(BaseModel):

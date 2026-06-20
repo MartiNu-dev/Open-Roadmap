@@ -256,7 +256,8 @@ def update_block_details(
     if block is None:
         raise HTTPException(status_code=404, detail="Block not found")
     for field in ("title", "short_description", "detailed_content", "level",
-                  "estimated_duration", "node_style", "x", "y", "width", "height"):
+                  "estimated_duration", "node_style", "x", "y", "width", "height",
+                  "kind", "bg_color", "label_position", "label_align"):
         setattr(block, field, getattr(payload, field))
     db.commit()
     db.refresh(block)
@@ -287,6 +288,8 @@ def create_block(
         estimated_duration=payload.estimated_duration,
         node_style=payload.node_style,
         x=payload.x, y=payload.y, width=payload.width, height=payload.height,
+        kind=payload.kind, bg_color=payload.bg_color,
+        label_position=payload.label_position, label_align=payload.label_align,
         order_index=(max_order or 0) + 1,
     )
     db.add(block)

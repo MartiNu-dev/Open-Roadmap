@@ -105,9 +105,31 @@ export default function RoadmapDetail() {
       const { data } = await api.post(`/roadmaps/${roadmap.id}/blocks`, {
         title: "Block", short_description: "", detailed_content: "",
         level: "", estimated_duration: "", node_style: "primary",
-        x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), width: 220, height: 64,
+        x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), width: 220, height: 44,
       });
       setRoadmap((rm) => ({ ...rm, blocks: [...rm.blocks, data] }));
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
+  const handleAddGroupAt = async (x, y) => {
+    try {
+      const { data } = await api.post(`/roadmaps/${roadmap.id}/blocks`, {
+        title: "Group", short_description: "", detailed_content: "",
+        level: "", estimated_duration: "", node_style: "primary",
+        kind: "group", bg_color: "#0f172a", label_position: "bottom", label_align: "center",
+        x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), width: 360, height: 200,
+      });
+      setRoadmap((rm) => ({ ...rm, blocks: [...rm.blocks, data] }));
+    } catch (e) { alert(formatApiError(e)); }
+  };
+
+  const handleResizeBlock = async (blockId, x, y, width, height) => {
+    try {
+      const { data } = await api.patch(`/blocks/${blockId}/position`, { x, y, width, height });
+      setRoadmap((rm) => ({
+        ...rm,
+        blocks: rm.blocks.map((b) => (b.id === blockId ? { ...b, ...data } : b)),
+      }));
     } catch (e) { alert(formatApiError(e)); }
   };
 
@@ -275,6 +297,8 @@ export default function RoadmapDetail() {
           onDeleteLink={handleDeleteLink}
           onSelectLink={handleSelectLink}
           onAddBlockAt={handleAddBlockAt}
+          onAddGroupAt={handleAddGroupAt}
+          onResizeBlock={handleResizeBlock}
         />
       </div>
 

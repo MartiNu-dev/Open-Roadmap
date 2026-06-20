@@ -9,9 +9,13 @@ def run_migrations(engine: Engine) -> None:
     needed = {
         "x": "INTEGER NOT NULL DEFAULT 0",
         "y": "INTEGER NOT NULL DEFAULT 0",
-        "width": "INTEGER NOT NULL DEFAULT 200",
-        "height": "INTEGER NOT NULL DEFAULT 64",
+        "width": "INTEGER NOT NULL DEFAULT 220",
+        "height": "INTEGER NOT NULL DEFAULT 44",
         "node_style": "VARCHAR NOT NULL DEFAULT 'primary'",
+        "kind": "VARCHAR NOT NULL DEFAULT 'block'",
+        "bg_color": "VARCHAR NOT NULL DEFAULT '#0f172a'",
+        "label_position": "VARCHAR NOT NULL DEFAULT 'bottom'",
+        "label_align": "VARCHAR NOT NULL DEFAULT 'center'",
     }
     link_cols = {c["name"] for c in insp.get_columns("roadmap_links")} if "roadmap_links" in insp.get_table_names() else set()
     link_needed = {

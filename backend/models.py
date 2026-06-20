@@ -62,9 +62,14 @@ class RoadmapBlock(Base):
     # Canvas layout
     x = Column(Integer, nullable=False, default=0)
     y = Column(Integer, nullable=False, default=0)
-    width = Column(Integer, nullable=False, default=200)
-    height = Column(Integer, nullable=False, default=64)
+    width = Column(Integer, nullable=False, default=220)
+    height = Column(Integer, nullable=False, default=44)
     node_style = Column(String, nullable=False, default="primary")  # primary | alternative | optional | label
+    # Object kind + group-only visual props
+    kind = Column(String, nullable=False, default="block")          # block | group
+    bg_color = Column(String, nullable=False, default="#0f172a")    # group background (slate-900 by default)
+    label_position = Column(String, nullable=False, default="bottom")  # top | bottom
+    label_align = Column(String, nullable=False, default="center")     # left | center | right
 
     roadmap = relationship("Roadmap", back_populates="blocks")
     resources = relationship(

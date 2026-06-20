@@ -28,6 +28,17 @@ const STYLE_OPTIONS = [
 
 const LEVEL_OPTIONS = ["", "beginner", "intermediate", "advanced"];
 
+const GROUP_BG_PRESETS = ["#0f172a", "#1e293b", "#334155", "#1e3a8a", "#065f46", "#7c2d12", "#581c87", "#9f1239"];
+const POSITIONS = [
+  { value: "top", label: "Top" },
+  { value: "bottom", label: "Bottom" },
+];
+const ALIGNS = [
+  { value: "left", label: "Left" },
+  { value: "center", label: "Center" },
+  { value: "right", label: "Right" },
+];
+
 function ResourceRow({ resource, onUpdate, onDelete }) {
   const [draft, setDraft] = useState({
     label: resource.label,
@@ -115,6 +126,9 @@ export default function BlockSidePanel({
         level: block.level || "",
         estimated_duration: block.estimated_duration || "",
         node_style: block.node_style || "primary",
+        bg_color: block.bg_color || "#0f172a",
+        label_position: block.label_position || "bottom",
+        label_align: block.label_align || "center",
       });
     }
   }, [block?.id]);
@@ -123,12 +137,21 @@ export default function BlockSidePanel({
   useEffect(() => {
     if (!form || !block || !canManage) return;
     if (initialBlockIdRef.current !== block.id) return;
-    const changed = (form.title !== block.title) || (form.short_description !== (block.short_description || ""))
-      || (form.detailed_content !== (block.detailed_content || "")) || (form.level !== (block.level || ""))
-      || (form.estimated_duration !== (block.estimated_duration || "")) || (form.node_style !== (block.node_style || "primary"));
+    const changed = (form.title !== block.title)
+      || (form.short_description !== (block.short_description || ""))
+      || (form.detailed_content !== (block.detailed_content || ""))
+      || (form.level !== (block.level || ""))
+      || (form.estimated_duration !== (block.estimated_duration || ""))
+      || (form.node_style !== (block.node_style || "primary"))
+      || (form.bg_color !== (block.bg_color || "#0f172a"))
+      || (form.label_position !== (block.label_position || "bottom"))
+      || (form.label_align !== (block.label_align || "center"));
     if (!changed) return;
-    if (!form.title || !form.title.trim()) return;
-    const t = setTimeout(() => onSave?.(form), 500);
+    // Group can have empty title; block requires title
+    const isGroup = block.kind === "group";
+    if (!isGroup && (!form.title || !form.title.trim())) return;
+    const safeTitle = isGroup ? (form.title || "Group") : form.title;
+    const t = setTimeout(() => onSave?.({ ...form, title: safeTitle }), 500);
     return () => clearTimeout(t);
   }, [form, canManage]);
 
@@ -160,77 +183,135 @@ export default function BlockSidePanel({
 
         <div className="flex-1 p-6 space-y-8">
           {canManage ? (
-            <>
-              <div className="space-y-4" data-testid="block-editor-form">
+            block.kind === "group" ? (
+              <div className="space-y-4" data-testid="group-editor-form">
                 <div>
-                  <Label>Title</Label>
-                  <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-block-title" />
+                  <Label>Label (optional)</Label>
+                  <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-group-title" />
                 </div>
                 <div>
-                  <Label>Short description</Label>
-                  <Input value={form.short_description} onChange={(e) => setField("short_description", e.target.value)} data-testid="edit-block-short" />
-                </div>
-                <div>
-                  <Label>Detailed content</Label>
-                  <Textarea rows={5} value={form.detailed_content} onChange={(e) => setField("detailed_content", e.target.value)} data-testid="edit-block-detail" />
-                  <p className="text-xs text-slate-500 mt-1">Supports <span className="font-mono">Markdown</span> — headings, **bold**, lists, [links](url), `code`, tables…</p>
+                  <Label>Background color</Label>
+                  <div className="flex flex-wrap gap-2 mt-1" data-testid="group-bg-presets">
+                    {GROUP_BG_PRESETS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setField("bg_color", c)}
+                        className={`w-7 h-7 rounded-md border-2 transition ${form.bg_color === c ? "border-slate-900 scale-110" : "border-slate-200"}`}
+                        style={{ background: c }}
+                        data-testid={`group-bg-${c.replace("#", "")}`}
+                        aria-label={`Color ${c}`}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={form.bg_color}
+                      onChange={(e) => setField("bg_color", e.target.value)}
+                      className="w-7 h-7 rounded-md border-2 border-slate-200 cursor-pointer"
+                      data-testid="group-bg-picker"
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Level</Label>
+                    <Label>Label position</Label>
                     <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
-                      value={form.level} onChange={(e) => setField("level", e.target.value)} data-testid="edit-block-level">
-                      {LEVEL_OPTIONS.map((l) => <option key={l || "none"} value={l}>{l || "— none —"}</option>)}
+                      value={form.label_position}
+                      onChange={(e) => setField("label_position", e.target.value)}
+                      data-testid="edit-group-label-position">
+                      {POSITIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <Label>Duration</Label>
-                    <Input value={form.estimated_duration} onChange={(e) => setField("estimated_duration", e.target.value)} placeholder="e.g. 4h" data-testid="edit-block-duration" />
+                    <Label>Text alignment</Label>
+                    <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                      value={form.label_align}
+                      onChange={(e) => setField("label_align", e.target.value)}
+                      data-testid="edit-group-label-align">
+                      {ALIGNS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                    </select>
                   </div>
-                </div>
-                <div>
-                  <Label>Block style</Label>
-                  <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
-                    value={form.node_style} onChange={(e) => setField("node_style", e.target.value)} data-testid="edit-block-style">
-                    {STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
                 </div>
                 <div className="flex gap-2 pt-2 items-center">
                   <span className="text-xs text-slate-500 italic">{saving ? "Saving…" : "Auto-saves as you type"}</span>
-                  <Button variant="outline" onClick={onDelete} data-testid="edit-block-delete-btn" className="ml-auto">
-                    <Trash2 size={14} className="mr-1 text-red-600" /> Delete block
+                  <Button variant="outline" onClick={onDelete} data-testid="edit-group-delete-btn" className="ml-auto">
+                    <Trash2 size={14} className="mr-1 text-red-600" /> Delete group
                   </Button>
                 </div>
               </div>
-
-              <div className="space-y-3" data-testid="block-editor-resources">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500">Resources</h4>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onAddResource?.(block.id)}
-                    data-testid="resource-add-btn"
-                  >
-                    <Plus size={14} className="mr-1" /> Add
-                  </Button>
-                </div>
-                {(block.resources?.length ?? 0) === 0 ? (
-                  <p className="text-xs text-slate-500 italic">No resources yet. Add links to docs, articles, videos or courses.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {block.resources.map((r) => (
-                      <ResourceRow
-                        key={r.id}
-                        resource={r}
-                        onUpdate={onUpdateResource}
-                        onDelete={onDeleteResource}
-                      />
-                    ))}
+            ) : (
+              <>
+                <div className="space-y-4" data-testid="block-editor-form">
+                  <div>
+                    <Label>Title</Label>
+                    <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-block-title" />
                   </div>
-                )}
-              </div>
-            </>
+                  <div>
+                    <Label>Short description</Label>
+                    <Input value={form.short_description} onChange={(e) => setField("short_description", e.target.value)} data-testid="edit-block-short" />
+                  </div>
+                  <div>
+                    <Label>Detailed content</Label>
+                    <Textarea rows={5} value={form.detailed_content} onChange={(e) => setField("detailed_content", e.target.value)} data-testid="edit-block-detail" />
+                    <p className="text-xs text-slate-500 mt-1">Supports <span className="font-mono">Markdown</span> — headings, **bold**, lists, [links](url), `code`, tables…</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Level</Label>
+                      <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                        value={form.level} onChange={(e) => setField("level", e.target.value)} data-testid="edit-block-level">
+                        {LEVEL_OPTIONS.map((l) => <option key={l || "none"} value={l}>{l || "— none —"}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Duration</Label>
+                      <Input value={form.estimated_duration} onChange={(e) => setField("estimated_duration", e.target.value)} placeholder="e.g. 4h" data-testid="edit-block-duration" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Block style</Label>
+                    <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                      value={form.node_style} onChange={(e) => setField("node_style", e.target.value)} data-testid="edit-block-style">
+                      {STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex gap-2 pt-2 items-center">
+                    <span className="text-xs text-slate-500 italic">{saving ? "Saving…" : "Auto-saves as you type"}</span>
+                    <Button variant="outline" onClick={onDelete} data-testid="edit-block-delete-btn" className="ml-auto">
+                      <Trash2 size={14} className="mr-1 text-red-600" /> Delete block
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3" data-testid="block-editor-resources">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500">Resources</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onAddResource?.(block.id)}
+                      data-testid="resource-add-btn"
+                    >
+                      <Plus size={14} className="mr-1" /> Add
+                    </Button>
+                  </div>
+                  {(block.resources?.length ?? 0) === 0 ? (
+                    <p className="text-xs text-slate-500 italic">No resources yet. Add links to docs, articles, videos or courses.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {block.resources.map((r) => (
+                        <ResourceRow
+                          key={r.id}
+                          resource={r}
+                          onUpdate={onUpdateResource}
+                          onDelete={onDeleteResource}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )
           ) : (
             <>
               {block.detailed_content && (

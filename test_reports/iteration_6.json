@@ -1,0 +1,91 @@
+{
+  "summary": "Phase 8 (group canvas object, snap-to-grid via SHIFT, corner-handle resize, smaller default block height) verified. 9/9 new Phase-8 backend tests pass and all 30 prior regression tests still green (combined 39/39). Frontend Playwright walkthrough confirms Add-group toolbar button, group side-panel editor (form + 8 presets + picker + label-position + label-align), 4 corner resize handles with correct nwse/nesw cursors, resize persistence across reload, SHIFT+resize snapping (w=384, h=192 both %24=0), and group z-index=0 vs block z-index=1 (groups behind blocks). ONE FRONTEND DEFECT FOUND: newly-added blocks render at DOM height 64 (not 44), even though the API backend default is correctly 44 (pytest-verified) — likely a render-time issue where the local positions cache uses a stale value or CSS overrides p.height. Right-click context menu test was inconclusive (off-screen click coords) and SHIFT+drag-move Y did not snap exactly to multiples of 24 (X did).",
+  "tested_scope": [
+    "POST/PUT/PATCH blocks with kind/bg_color/label_position/label_align",
+    "PATCH /blocks/{id}/position with width+height (resize)",
+    "Default block dims 220x44 backend",
+    "Link block→group",
+    "Role enforcement (anon 401, user 403) for new fields",
+    "30-test regression (cookie+CSRF+resources, filter/search)",
+    "Frontend Add-group toolbar + side-panel group editor",
+    "Resize handles cursors + drag-resize persistence",
+    "SHIFT snap-to-grid on resize (w,h both multiples of 24)",
+    "Group z-order behind blocks"
+  ],
+  "backend_tests": {
+    "files": [
+      "/app/backend/tests/test_phase8_groups_resize.py (new, 9 tests)",
+      "/app/backend/tests/test_filter_search.py (regression, 13 tests)",
+      "/app/backend/tests/test_cookie_csrf_resources.py (regression, 17 tests)"
+    ],
+    "junit_xml": "/app/test_reports/pytest/iteration_6.xml",
+    "totals": {"new": "9/9", "regression": "30/30", "combined": "39/39"},
+    "key_assertions": [
+      "POST /api/roadmaps/frontend/blocks (editor) {kind:'group', bg_color:'#1e3a8a', label_position:'top', label_align:'left', width:400, height:200} -> 201 echoes all fields and persists in GET /api/roadmaps/frontend",
+      "GET /api/roadmaps/frontend BlockOut on every block now includes kind ('block'|'group'), bg_color (starts with #), label_position, label_align",
+      "PUT /api/blocks/{id} updates kind/bg_color/label_position/label_align (#7c3aed, top, right) and persists",
+      "PATCH /api/blocks/{id}/position {x,y,width,height} persists; omitting w/h keeps prior dims (only x/y change)",
+      "POST /api/roadmaps/{id}/blocks WITHOUT explicit dims defaults to 220x44 (backend now smaller height)",
+      "POST /api/roadmaps/{id}/links {from_block_id=block, to_block_id=group} -> 201 (groups linkable)",
+      "Anonymous POST/PATCH on new fields -> 401; user role -> 403"
+    ]
+  },
+  "frontend_tests": {
+    "passed_steps": [
+      "Login as editor; open /roadmaps/frontend then click 'Edit canvas' -> editor-toolbar visible with editor-add-group-btn",
+      "Click editor-add-group-btn -> canvas-group-{id} created with data-block-kind='group'",
+      "Clicking the group opens BlockSidePanel with group-editor-form, edit-group-title, 8 group-bg-presets buttons, group-bg-picker color input, edit-group-label-position select, edit-group-label-align select",
+      "Selecting label_position='top' auto-saves and persists",
+      "Hovering a block exposes 4 resize handles (nw/ne/sw/se) each present with correct cursor: nw/se=nwse-resize, ne/sw=nesw-resize",
+      "Dragging SE corner enlarges block from 220x64 to 364x148; after reload dims persist (364x148)",
+      "SHIFT+drag-resize SE corner snaps both width AND height to multiples of 24 (384x192)",
+      "Group z-index=0; block z-index=1 (groups render behind blocks)",
+      "Cleanup: DELETE /api/blocks/{id} returned 204 for the test block and test group"
+    ],
+    "failed_or_inconclusive_steps": [
+      "Newly-added block via editor-add-block-btn rendered at DOM height 64 (same as seeded blocks); spec says new blocks should be 44. Backend POST default is 220x44 (pytest-verified), so this is a frontend render bug.",
+      "Right-click context menu (canvas-context-menu / ctx-add-block / ctx-add-group) was not visible at the test coordinate (canvas extends beyond viewport; coords landed off-canvas). Should be retested with coords inside the visible canvas bounds (~430x330 px).",
+      "SHIFT+drag-move: final left=360 (left%24=0 OK) but top=560 (top%24=8) — Y axis did not snap to multiples of 24. X works, Y does not."
+    ]
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RoadmapCanvas/RoadmapDetail handleAddBlockAt", "issue": "Newly added blocks render at offsetHeight=64 rather than 44. Either the POST is sending height=64 (despite RoadmapDetail.jsx line 108 showing height:44) OR the locally-cached positions map keeps a stale 64. Check whether the optimistic state writes height before the API returns, or whether a CSS rule (min-height) overrides the inline style.", "selector": "[data-testid^='canvas-block-']", "priority": "MEDIUM"},
+      {"component": "RoadmapCanvas snap-to-grid (drag-move)", "issue": "SHIFT+drag-move snaps X (left%24=0) but does NOT snap Y (top=560, 560%24=8). Likely the snap formula is applied to dx only or to one axis. Resize SHIFT-snap works correctly for both axes.", "selector": "[data-testid^='canvas-block-']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Group side panel", "issues": ["A11y warning: Missing `Description` or `aria-describedby` on DialogContent (Radix UI). Cosmetic but visible in console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase8_groups_resize.py",
+    "/app/backend/tests/test_filter_search.py",
+    "/app/backend/tests/test_cookie_csrf_resources.py",
+    "/app/test_reports/pytest/iteration_6.xml"
+  ],
+  "action_items": [
+    "Fix new-block default rendered height to 44 (check RoadmapDetail.handleAddBlockAt + RoadmapCanvas inline style for stale state or CSS min-height override).",
+    "Fix SHIFT+drag-move Y-axis snapping — should apply Math.round(y/24)*24 to top as well as left.",
+    "Re-test right-click context menu with coords inside the visible canvas (the previous coords were off-canvas). data-testids exist in code; just couldn't be confirmed in this run.",
+    "Add `aria-describedby` / DialogDescription to DialogContent in the side panel (cosmetic a11y)."
+  ],
+  "critical_code_review_comments": [
+    "Backend: BlockUpsertIn now defaults width=220/height=44 — matches spec. PUT update_block_details iterates a fixed field tuple including the four new fields — robust and concise.",
+    "Backend: PATCH /blocks/{id}/position correctly treats width/height as Optional and only updates when provided — verified via test (omitting them keeps prior dims).",
+    "Backend: migrations.run_migrations is idempotent and adds the four new columns + bumps defaults; tested against a populated DB (seeded blocks remain at height=64 — expected, no migration rewrite).",
+    "Frontend RoadmapCanvas.jsx is ~430 lines and contains multiple concerns (group renderer, resize handles, context menu, snap, drag). Worth splitting into useResizeBlock / useDragBlock hooks and a GroupNode subcomponent file.",
+    "Snap-to-grid logic appears asymmetric (X snaps, Y doesn't on drag-move) — check the dragMove handler for Math.round(v/24)*24 applied to BOTH dx and dy when shiftKey is held.",
+    "Group z-index=0 vs block z-index=1 verified — groups render behind, but groups are still clickable via DOM (which is fine). Be aware that anchors (data-testid=anchor-*-{id}) on groups currently overlay block edges — confirm linking from a group anchor to a block still works when the block sits visually on top.",
+    "Frontend: handleAddBlockAt sends height:44 in JSON but DOM shows 64; likely a positions cache desync — recommend writing the server response back into positions immediately (already doing? double-check)."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase8_groups_resize.py (new)"],
+  "success_rate": {"backend": "100% (39/39)", "frontend": "~70% (7 of 10 steps fully green; 1 confirmed bug, 1 partial snap bug, 1 inconclusive)"},
+  "test_credentials": "admin@example.com/admin123, editor@example.com/editor123, user@example.com/user123 — all verified working",
+  "seed_data_creation": "Backend pytest created+deleted its own TEST_-prefixed blocks/groups (cleanup successful). Frontend Playwright created 1 group + 1 block and DELETE-cleaned them via API (204). DB clean.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 8 backend verified at 39/39 (test_phase8_groups_resize.py + regression). Frontend has 2 confirmed defects: (1) new blocks render at h=64 not h=44 even though backend default is 44 — investigate handleAddBlockAt local-cache or CSS min-height; (2) SHIFT+drag-move only snaps X, not Y — check the drag handler for Y snap. Right-click context-menu coverage is inconclusive — testids ctx-add-block / ctx-add-group / canvas-context-menu exist in RoadmapCanvas.jsx around lines 407-420. Editor uses route /roadmaps/:slug then click 'Edit canvas' button (the ?edit=1 querystring is NOT honored). After fixes, re-run /app/backend/tests/ (all 39) and the same Playwright walkthrough.",
+  "rca_of_the_issue": "(1) Block height=64 on new blocks: handleAddBlockAt at /app/frontend/src/pages/RoadmapDetail.jsx:108 already sends height:44; bug is most likely an optimistic insert path that hardcodes 64 OR a CSS min-height on the wrapper. Quick repro: click 'Add block' in editor mode -> inspect new [data-testid^='canvas-block-'] element -> el.style.height='44px' but el.offsetHeight=64. (2) SHIFT+drag Y snap miss: in drag-move handler the snap formula appears applied to dx (Math.round(dx/24)*24) but not dy, leading to X-only snapping. Resize handler does apply to both axes — proof that the snap function is correct in the resize path."
+}
