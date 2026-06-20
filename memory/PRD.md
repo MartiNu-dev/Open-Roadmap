@@ -15,6 +15,17 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 - Schema: User, Roadmap, RoadmapBlock, BlockResource, UserProgress (unique on user_id+block_id)
 - Auth: Bearer JWT (7 day expiry) + dependency-injected `get_current_user`, `require_roles(...)`
 
+## Phase 6 — DONE (2026-02): Cookie+CSRF auth + Resources CRUD
+- [x] Auth migrated from Bearer/localStorage to **httpOnly cookies + double-submit CSRF**
+      Backend: `_set_auth_cookies` + `csrf_protect` middleware; login/register CSRF-exempt; Bearer still accepted for backward compat
+      Frontend: `api.js` axios `withCredentials: true` + `X-CSRF-Token` interceptor; `AuthContext` no longer touches localStorage; page reload keeps session via cookie
+- [x] CORS: `allow_credentials` toggles automatically when `CORS_ORIGINS` env is set (echoes origin)
+- [x] **Resources CRUD inside block editor** (editor/admin only)
+      Backend: `POST /api/blocks/{block_id}/resources`, `PATCH /api/resources/{id}`, `DELETE /api/resources/{id}`
+      Schemas: `ResourceCreateIn`, `ResourceUpdateIn` (article|video|docs|course)
+      Frontend: new `Resources` section in `BlockSidePanel` (canManage) with Add button, inline label/kind/url editing (500ms debounced auto-save), delete with confirm. Viewer mode unchanged.
+- [x] Regression suite added: `/app/backend/tests/test_cookie_csrf_resources.py` (17 tests, all pass)
+
 ## Phase 5 — DONE (2026-02): Canvas UX round 2
 - [x] Auto-save in block edit form (debounced 500ms; status text "Auto-saves as you type")
 - [x] Double-click on empty canvas area creates a new block at the cursor position
@@ -74,9 +85,9 @@ Containerized web application inspired by roadmap.sh (no AI features). Users bro
 
 ## Phase 2 — Backlog
 P0
-- [ ] Admin user management UI (list users, change role, deactivate) — backend endpoints + page
-- [ ] Roadmap CRUD UI (editor + admin): create / edit / archive / publish
-- [ ] Block management UI (CRUD on blocks + resources, reorder)
+- [x] Admin user management UI (list users, change role, deactivate) — backend endpoints + page
+- [x] Roadmap CRUD UI (editor + admin): create / edit / archive / publish
+- [x] Block management UI (CRUD on blocks + resources, reorder)  *(resources CRUD shipped in Phase 6; block reorder still TBD if needed)*
 P1
 - [ ] User profile page (change name, password)
 - [ ] Notes editor on progress entries
@@ -85,6 +96,7 @@ P2
 - [ ] Roadmap tagging system
 - [ ] Public profile pages
 - [ ] Streak / weekly progress widget on dashboard
+- [ ] Refactor `RoadmapCanvas.jsx` into custom hooks (drag, path calc) and fix exhaustive-deps
 
 ## Personas
 - **Learner (user)**: browses, tracks progression, never sees other users' data
