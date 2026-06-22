@@ -1,0 +1,38 @@
+{
+  "roles": {
+    "admin": "Admin",
+    "editor": "Editor"
+  },
+  "roadmapStatus": {
+    "draft": "Draft",
+    "published": "Published",
+    "archived": "Archived"
+  },
+  "roadmaps": {
+    "title": "Manage roadmaps",
+    "description": "Create, publish, archive and delete roadmaps. Tag and level changes auto-save.",
+    "newRoadmap": "New roadmap",
+    "createRoadmap": "Create roadmap",
+    "coverEmoji": "Cover emoji",
+    "slug": "Slug (a-z, 0-9, dash)",
+    "titleField": "Title",
+    "descriptionField": "Description",
+    "level": "Level",
+    "initialStatus": "Initial status",
+    "tags": "Tags (comma-separated)",
+    "tagsPlaceholder": "e.g. web, react, css",
+    "metaTagsPlaceholder": "tags, comma-separated",
+    "saved": "saved",
+    "autoSaves": "auto-saves",
+    "deleteConfirm": "Delete roadmap \"{{title}}\" and all its blocks/progress? This cannot be undone."
+  },
+  "users": {
+    "eyebrow": "// Admin",
+    "title": "User management",
+    "description": "Promote users to editors/admins or remove inactive accounts.",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "deleteConfirm": "Delete user \"{{email}}\"? This cannot be undone."
+  }
+}

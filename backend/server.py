@@ -35,6 +35,7 @@ from schemas import (
     ProgressUpsertIn,
     RegisterIn,
     ResourceCreateIn,
+    ResourceReorderIn,
     ResourceOut,
     ResourceUpdateIn,
     RoadmapCreateIn,
@@ -357,6 +358,43 @@ def update_resource(
     db.commit()
     db.refresh(res)
     return ResourceOut.model_validate(res)
+
+
+@api.patch("/blocks/{block_id}/resources/reorder", response_model=List[ResourceOut])
+def reorder_resources(
+    block_id: str,
+    payload: ResourceReorderIn,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    block = db.query(RoadmapBlock).filter(RoadmapBlock.id == block_id).first()
+    if block is None:
+        raise HTTPException(status_code=404, detail="Block not found")
+
+    resources = (
+        db.query(BlockResource)
+        .filter(BlockResource.block_id == block_id)
+        .order_by(BlockResource.order_index.asc(), BlockResource.id.asc())
+        .all()
+    )
+    if not resources:
+        raise HTTPException(status_code=400, detail="Block has no resources")
+
+    current_ids = [res.id for res in resources]
+    if len(payload.resource_ids) != len(current_ids):
+        raise HTTPException(status_code=400, detail="Resource list length mismatch")
+    if set(payload.resource_ids) != set(current_ids):
+        raise HTTPException(status_code=400, detail="Resource list must match the block resources exactly")
+
+    by_id = {res.id: res for res in resources}
+    ordered = [by_id[resource_id] for resource_id in payload.resource_ids]
+    for index, res in enumerate(ordered, start=1):
+        res.order_index = index
+
+    db.commit()
+    for res in ordered:
+        db.refresh(res)
+    return [ResourceOut.model_validate(res) for res in ordered]
 
 
 @api.delete("/resources/{resource_id}", status_code=204)

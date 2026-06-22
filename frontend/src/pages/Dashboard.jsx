@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Navbar from "@/components/Navbar";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -7,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useTranslation(["common", "dashboard", "roadmaps"]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,13 +36,13 @@ export default function Dashboard() {
       <Navbar />
       <div className="max-w-5xl mx-auto px-6 py-16">
         <div className="mb-10">
-          <div className="text-xs font-mono uppercase tracking-[0.2em] text-slate-500 mb-3">// Welcome back, {user?.name}</div>
-          <h1 className="font-display text-4xl font-bold tracking-tight text-slate-900">Your dashboard</h1>
-          <p className="mt-3 text-slate-600">Continue where you left off.</p>
+          <div className="text-xs font-mono uppercase tracking-[0.2em] text-slate-500 mb-3">{t("dashboard:eyebrow", { name: user?.name || "" })}</div>
+          <h1 className="font-display text-4xl font-bold tracking-tight text-slate-900">{t("dashboard:title")}</h1>
+          <p className="mt-3 text-slate-600">{t("dashboard:subtitle")}</p>
         </div>
 
         {loading ? (
-          <div className="text-slate-500 text-sm">Loading…</div>
+          <div className="text-slate-500 text-sm">{t("common:loading")}</div>
         ) : (
           <div className="space-y-4" data-testid="dashboard-list">
             {items.map(({ roadmap, prog }) => (
@@ -54,7 +56,7 @@ export default function Dashboard() {
                 </div>
                 <div className="w-48 shrink-0">
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-500 font-mono">{prog.completed_blocks}/{prog.total_blocks}</span>
+                    <span className="text-slate-500 font-mono">{t("roadmaps:detail.progressCount", { completed: prog.completed_blocks, total: prog.total_blocks })}</span>
                     <span className="font-medium">{prog.percent_complete}%</span>
                   </div>
                   <Progress value={prog.percent_complete} className="h-2" />

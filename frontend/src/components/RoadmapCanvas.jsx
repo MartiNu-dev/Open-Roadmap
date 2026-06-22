@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+﻿import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, Loader2, Plus, Square } from "lucide-react";
+import { getLevelLabel } from "@/i18n/formatters";
 
 const NODE_STYLES = {
   primary: "bg-yellow-100 border-slate-900 text-slate-900",
@@ -12,9 +14,9 @@ const STATUS_RING = {
   completed: "ring-2 ring-emerald-500 ring-offset-2",
 };
 const LEVEL_CROWN = {
-  beginner: { color: "text-yellow-500", title: "Beginner" },
-  intermediate: { color: "text-slate-400", title: "Intermediate" },
-  advanced: { color: "text-amber-500", title: "Advanced" },
+  beginner: { color: "text-yellow-500" },
+  intermediate: { color: "text-slate-400" },
+  advanced: { color: "text-amber-500" },
 };
 const THICKNESS = { small: 1.5, medium: 2.5, large: 4 };
 const DASH = { solid: "", dashed: "8 6", dotted: "2 5" };
@@ -32,7 +34,8 @@ const RESIZE_CURSOR = { nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize",
 function curvedPath(a, b, fromSide = "bottom", toSide = "top") {
   const off = Math.max(40, Math.min(120, Math.hypot(b.x - a.x, b.y - a.y) / 2));
   const dir = (side) => ({ top: [0, -off], bottom: [0, off], left: [-off, 0], right: [off, 0] }[side]);
-  const [c1x, c1y] = dir(fromSide); const [c2x, c2y] = dir(toSide);
+  const [c1x, c1y] = dir(fromSide);
+  const [c2x, c2y] = dir(toSide);
   return `M ${a.x},${a.y} C ${a.x + c1x},${a.y + c1y} ${b.x + c2x},${b.y + c2y} ${b.x},${b.y}`;
 }
 
@@ -42,11 +45,12 @@ function StatusBadge({ status }) {
   return null;
 }
 
-function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseDown, onResizeMouseDown, onClick, onContextMenu, suppressClickRef }) {
+function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseDown, onResizeMouseDown, onClick, suppressClickRef }) {
   const labelTop = block.label_position === "top";
   const align = block.label_align || "center";
   const alignCls = align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center";
   const labelStyle = { color: "#fff" };
+
   return (
     <div
       data-block-id={block.id}
@@ -58,10 +62,7 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
       onClick={() => { if (!suppressClickRef.current) onClick?.(block); }}
       onContextMenu={(e) => { e.preventDefault(); if (!suppressClickRef.current) onClick?.(block); }}
     >
-      <div
-        className="relative w-full h-full rounded-md flex flex-col"
-        style={{ background: block.bg_color || "#0f172a" }}
-      >
+      <div className="relative w-full h-full rounded-md flex flex-col" style={{ background: block.bg_color || "#0f172a" }}>
         {block.title && labelTop && (
           <div className={`px-3 py-1 text-xs font-mono uppercase tracking-wider ${alignCls}`} style={labelStyle}>{block.title}</div>
         )}
@@ -115,9 +116,10 @@ export default function RoadmapCanvas({
   onSelectBlock, onMoveBlock, onCreateLink, onDeleteLink, onSelectLink,
   onAddBlockAt, onAddGroupAt, onResizeBlock,
 }) {
+  const { t } = useTranslation("roadmaps");
   const [positions, setPositions] = useState({});
   const [pendingLink, setPendingLink] = useState(null);
-  const [menu, setMenu] = useState(null); // {clientX, clientY, canvas}
+  const [menu, setMenu] = useState(null);
   const draggingRef = useRef(null);
   const suppressClickRef = useRef(false);
   const wrapRef = useRef(null);
@@ -125,22 +127,24 @@ export default function RoadmapCanvas({
   useEffect(() => {
     if (!roadmap) return;
     const next = {};
-    for (const b of roadmap.blocks) next[b.id] = { x: b.x, y: b.y, width: b.width, height: b.height };
+    for (const block of roadmap.blocks) next[block.id] = { x: block.x, y: block.y, width: block.width, height: block.height };
     setPositions(next);
   }, [roadmap?.id, roadmap?.blocks?.length]);
 
   const bounds = useMemo(() => {
-    let mx = 800, my = 600;
-    for (const b of roadmap?.blocks || []) {
-      const p = positions[b.id] || b;
-      mx = Math.max(mx, p.x + p.width + 100);
-      my = Math.max(my, p.y + p.height + 120);
+    let mx = 800;
+    let my = 600;
+    for (const block of roadmap?.blocks || []) {
+      const point = positions[block.id] || block;
+      mx = Math.max(mx, point.x + point.width + 100);
+      my = Math.max(my, point.y + point.height + 120);
     }
     return { width: mx, height: my };
   }, [roadmap, positions]);
 
   const canvasPoint = (e) => {
-    const rect = wrapRef.current?.getBoundingClientRect(); if (!rect) return { x: 0, y: 0 };
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
     return { x: e.clientX - rect.left + wrapRef.current.scrollLeft, y: e.clientY - rect.top + wrapRef.current.scrollTop };
   };
 
@@ -148,88 +152,110 @@ export default function RoadmapCanvas({
     if (!isEditor || !editMode) return;
     if (e.target.closest("[data-no-drag]")) return;
     if (e.button !== 0) return;
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
     const initial = positions[block.id] || block;
     draggingRef.current = { id: block.id, startX: e.clientX, startY: e.clientY, initialX: initial.x, initialY: initial.y, moved: false, kind: "block" };
   }, [isEditor, editMode, positions]);
 
   const onAnchorMouseDown = (e, block, side) => {
-    e.preventDefault(); e.stopPropagation();
-    const p = positions[block.id] || block;
-    draggingRef.current = { kind: "link", fromId: block.id, fromSide: side, from: ANCHOR_POS[side](p) };
-    setPendingLink({ from: ANCHOR_POS[side](p), cursor: canvasPoint(e) });
+    e.preventDefault();
+    e.stopPropagation();
+    const point = positions[block.id] || block;
+    draggingRef.current = { kind: "link", fromId: block.id, fromSide: side, from: ANCHOR_POS[side](point) };
+    setPendingLink({ from: ANCHOR_POS[side](point), cursor: canvasPoint(e) });
   };
 
   const onResizeMouseDown = (e, block, corner) => {
     if (!isEditor || !editMode) return;
-    e.preventDefault(); e.stopPropagation();
-    const p = positions[block.id] || block;
+    e.preventDefault();
+    e.stopPropagation();
+    const point = positions[block.id] || block;
     draggingRef.current = {
       kind: "resize", id: block.id, corner,
       startX: e.clientX, startY: e.clientY,
-      initialX: p.x, initialY: p.y, initialW: p.width, initialH: p.height,
+      initialX: point.x, initialY: point.y, initialW: point.width, initialH: point.height,
       moved: false,
     };
   };
 
   useEffect(() => {
     function onMove(e) {
-      const d = draggingRef.current; if (!d) return;
-      if (d.kind === "block") {
-        let dx = e.clientX - d.startX, dy = e.clientY - d.startY;
-        if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
-        let nx = Math.max(0, d.initialX + dx);
-        let ny = Math.max(0, d.initialY + dy);
+      const drag = draggingRef.current;
+      if (!drag) return;
+      if (drag.kind === "block") {
+        let dx = e.clientX - drag.startX;
+        let dy = e.clientY - drag.startY;
+        if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+        let nx = Math.max(0, drag.initialX + dx);
+        let ny = Math.max(0, drag.initialY + dy);
         if (e.shiftKey) { nx = snap(nx); ny = snap(ny); }
-        setPositions((prev) => ({ ...prev, [d.id]: { ...prev[d.id], x: nx, y: ny } }));
-      } else if (d.kind === "resize") {
-        const dx = e.clientX - d.startX, dy = e.clientY - d.startY;
-        if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
-        let nx = d.initialX, ny = d.initialY, nw = d.initialW, nh = d.initialH;
-        const MIN_W = 80, MIN_H = 36;
-        if (d.corner.includes("e")) nw = Math.max(MIN_W, d.initialW + dx);
-        if (d.corner.includes("s")) nh = Math.max(MIN_H, d.initialH + dy);
-        if (d.corner.includes("w")) { nw = Math.max(MIN_W, d.initialW - dx); nx = d.initialX + (d.initialW - nw); }
-        if (d.corner.includes("n")) { nh = Math.max(MIN_H, d.initialH - dy); ny = d.initialY + (d.initialH - nh); }
+        setPositions((prev) => ({ ...prev, [drag.id]: { ...prev[drag.id], x: nx, y: ny } }));
+      } else if (drag.kind === "resize") {
+        const dx = e.clientX - drag.startX;
+        const dy = e.clientY - drag.startY;
+        if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+        let nx = drag.initialX;
+        let ny = drag.initialY;
+        let nw = drag.initialW;
+        let nh = drag.initialH;
+        const MIN_W = 80;
+        const MIN_H = 36;
+        if (drag.corner.includes("e")) nw = Math.max(MIN_W, drag.initialW + dx);
+        if (drag.corner.includes("s")) nh = Math.max(MIN_H, drag.initialH + dy);
+        if (drag.corner.includes("w")) { nw = Math.max(MIN_W, drag.initialW - dx); nx = drag.initialX + (drag.initialW - nw); }
+        if (drag.corner.includes("n")) { nh = Math.max(MIN_H, drag.initialH - dy); ny = drag.initialY + (drag.initialH - nh); }
         if (e.shiftKey) {
-          nx = snap(nx); ny = snap(ny); nw = Math.max(MIN_W, snap(nw)); nh = Math.max(MIN_H, snap(nh));
+          nx = snap(nx);
+          ny = snap(ny);
+          nw = Math.max(MIN_W, snap(nw));
+          nh = Math.max(MIN_H, snap(nh));
         }
-        setPositions((prev) => ({ ...prev, [d.id]: { x: nx, y: ny, width: nw, height: nh } }));
-      } else if (d.kind === "link") {
-        setPendingLink((pl) => pl ? { ...pl, cursor: canvasPoint(e) } : null);
+        setPositions((prev) => ({ ...prev, [drag.id]: { x: nx, y: ny, width: nw, height: nh } }));
+      } else if (drag.kind === "link") {
+        setPendingLink((current) => current ? { ...current, cursor: canvasPoint(e) } : null);
       }
     }
+
     async function onUp(e) {
-      const d = draggingRef.current; if (!d) return;
+      const drag = draggingRef.current;
+      if (!drag) return;
       draggingRef.current = null;
-      if (d.kind === "block") {
-        if (d.moved) {
+      if (drag.kind === "block") {
+        if (drag.moved) {
           suppressClickRef.current = true;
           setTimeout(() => { suppressClickRef.current = false; }, 100);
-          if (onMoveBlock) { const p = positions[d.id]; if (p) await onMoveBlock(d.id, p.x, p.y); }
+          if (onMoveBlock) {
+            const point = positions[drag.id];
+            if (point) await onMoveBlock(drag.id, point.x, point.y);
+          }
         }
-      } else if (d.kind === "resize") {
-        if (d.moved) {
+      } else if (drag.kind === "resize") {
+        if (drag.moved) {
           suppressClickRef.current = true;
           setTimeout(() => { suppressClickRef.current = false; }, 100);
-          const p = positions[d.id];
-          if (p && onResizeBlock) await onResizeBlock(d.id, p.x, p.y, p.width, p.height);
+          const point = positions[drag.id];
+          if (point && onResizeBlock) await onResizeBlock(drag.id, point.x, point.y, point.width, point.height);
         }
-      } else if (d.kind === "link") {
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        const card = el?.closest("[data-block-id]");
+      } else if (drag.kind === "link") {
+        const element = document.elementFromPoint(e.clientX, e.clientY);
+        const card = element?.closest("[data-block-id]");
         const targetId = card?.getAttribute("data-block-id");
-        const anchorEl = el?.closest("[data-anchor-side]");
+        const anchorEl = element?.closest("[data-anchor-side]");
         const targetSide = anchorEl?.getAttribute("data-anchor-side") || "top";
-        if (targetId && targetId !== d.fromId && onCreateLink) {
-          await onCreateLink({ from_block_id: d.fromId, to_block_id: targetId, from_side: d.fromSide, to_side: targetSide });
+        if (targetId && targetId !== drag.fromId && onCreateLink) {
+          await onCreateLink({ from_block_id: drag.fromId, to_block_id: targetId, from_side: drag.fromSide, to_side: targetSide });
         }
         setPendingLink(null);
       }
     }
+
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
   }, [positions, onMoveBlock, onCreateLink, onResizeBlock]);
 
   if (!roadmap) return null;
@@ -237,8 +263,8 @@ export default function RoadmapCanvas({
   const handleCanvasDoubleClick = (e) => {
     if (!isEditor || !editMode) return;
     if (e.target.closest("[data-block-id]")) return;
-    const p = canvasPoint(e);
-    onAddBlockAt?.(p.x - 110, p.y - 22);
+    const point = canvasPoint(e);
+    onAddBlockAt?.(point.x - 110, point.y - 22);
   };
 
   const handleCanvasContextMenu = (e) => {
@@ -248,22 +274,21 @@ export default function RoadmapCanvas({
     setMenu({ clientX: e.clientX, clientY: e.clientY, canvas: canvasPoint(e) });
   };
 
-  // Render groups first (lower z-index) so blocks sit on top
-  const groups = (roadmap.blocks || []).filter((b) => b.kind === "group");
-  const blocks = (roadmap.blocks || []).filter((b) => b.kind !== "group");
+  const groups = (roadmap.blocks || []).filter((block) => block.kind === "group");
+  const blocks = (roadmap.blocks || []).filter((block) => block.kind !== "group");
 
   return (
     <div className="relative" onClick={() => setMenu(null)}>
       {isEditor && editMode && (
         <div className="sticky top-32 z-20 bg-white/95 backdrop-blur border border-slate-200 rounded-md px-3 py-2 mb-3 flex items-center gap-3 text-sm w-fit shadow-sm" data-testid="editor-toolbar">
-          <span className="font-mono uppercase text-xs tracking-wider text-slate-500">Editor mode</span>
+          <span className="font-mono uppercase text-xs tracking-wider text-slate-500">{t("canvas.editorMode")}</span>
           <button onClick={() => onAddBlockAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-block-btn">
-            <Plus size={14} /> Add block
+            <Plus size={14} /> {t("canvas.addBlock")}
           </button>
           <button onClick={() => onAddGroupAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-group-btn">
-            <Square size={14} /> Add group
+            <Square size={14} /> {t("canvas.addGroup")}
           </button>
-          <span className="text-slate-400 text-xs">double-click empty area · drag side handles to link · drag corners to resize · hold SHIFT to snap to grid</span>
+          <span className="text-slate-400 text-xs">{t("canvas.toolbarHint")}</span>
         </div>
       )}
 
@@ -277,22 +302,25 @@ export default function RoadmapCanvas({
         <div className="relative" style={{ width: bounds.width, height: bounds.height }}>
           <svg className="absolute inset-0 pointer-events-none" width={bounds.width} height={bounds.height} data-testid="canvas-links" style={{ zIndex: 2 }}>
             {(roadmap.links || []).map((link) => {
-              const a = positions[link.from_block_id], b = positions[link.to_block_id];
-              if (!a || !b) return null;
-              const fs = link.from_side || "bottom", ts = link.to_side || "top";
-              const start = ANCHOR_POS[fs](a), end = ANCHOR_POS[ts](b);
+              const startNode = positions[link.from_block_id];
+              const endNode = positions[link.to_block_id];
+              if (!startNode || !endNode) return null;
+              const fromSide = link.from_side || "bottom";
+              const toSide = link.to_side || "top";
+              const start = ANCHOR_POS[fromSide](startNode);
+              const end = ANCHOR_POS[toSide](endNode);
               const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
               const stroke = link.color || "#475569";
-              const sw = THICKNESS[link.thickness] || 2.5;
+              const strokeWidth = THICKNESS[link.thickness] || 2.5;
               const dash = DASH[link.style] || "";
               return (
                 <g key={link.id}>
-                  <path d={curvedPath(start, end, fs, ts)} stroke="transparent" strokeWidth={14} fill="none"
+                  <path d={curvedPath(start, end, fromSide, toSide)} stroke="transparent" strokeWidth={14} fill="none"
                     className="cursor-pointer pointer-events-auto"
                     onClick={(e) => { e.stopPropagation(); onSelectLink?.(link); }}
                     onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onSelectLink?.(link); }}
                   />
-                  <path d={curvedPath(start, end, fs, ts)} stroke={stroke} strokeWidth={sw} fill="none" strokeDasharray={dash} className="pointer-events-none" />
+                  <path d={curvedPath(start, end, fromSide, toSide)} stroke={stroke} strokeWidth={strokeWidth} fill="none" strokeDasharray={dash} className="pointer-events-none" />
                   {link.label && (
                     <g className="pointer-events-none">
                       <rect x={mid.x - link.label.length * 4 - 8} y={mid.y - 11} width={link.label.length * 8 + 16} height={22} rx="6" fill="white" stroke="#cbd5e1" />
@@ -313,10 +341,9 @@ export default function RoadmapCanvas({
             )}
           </svg>
 
-          {/* Groups (z=0) — rendered first, behind blocks */}
           {groups.map((block) => {
-            const p = positions[block.id] || block;
-            const merged = { ...block, x: p.x, y: p.y, width: p.width, height: p.height };
+            const point = positions[block.id] || block;
+            const merged = { ...block, x: point.x, y: point.y, width: point.width, height: point.height };
             return (
               <GroupNode
                 key={block.id}
@@ -327,15 +354,13 @@ export default function RoadmapCanvas({
                 onAnchorMouseDown={onAnchorMouseDown}
                 onResizeMouseDown={onResizeMouseDown}
                 onClick={onSelectBlock}
-                onContextMenu={onSelectBlock}
                 suppressClickRef={suppressClickRef}
               />
             );
           })}
 
-          {/* Blocks (z=1) on top of groups */}
           {blocks.map((block) => {
-            const p = positions[block.id] || block;
+            const point = positions[block.id] || block;
             const styleCls = NODE_STYLES[block.node_style] || NODE_STYLES.primary;
             const status = progressByBlock?.[block.id]?.status || "not_started";
             const crown = LEVEL_CROWN[block.level];
@@ -346,7 +371,7 @@ export default function RoadmapCanvas({
                 data-block-kind="block"
                 data-testid={`canvas-block-${block.id}`}
                 className={`absolute select-none group ${editMode && isEditor ? "cursor-move" : "cursor-pointer"}`}
-                style={{ left: p.x, top: p.y, width: p.width, height: p.height, zIndex: 1 }}
+                style={{ left: point.x, top: point.y, width: point.width, height: point.height, zIndex: 1 }}
                 onMouseDown={(e) => onMouseDownBlock(e, block)}
                 onClick={() => {
                   if (suppressClickRef.current) return;
@@ -356,12 +381,12 @@ export default function RoadmapCanvas({
               >
                 <div className={`relative w-full h-full border-2 rounded-md flex items-center justify-center text-center px-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md ${styleCls} ${STATUS_RING[status]}`}>
                   {crown && (
-                    <span className={`absolute -top-2 -left-2 text-lg ${crown.color} drop-shadow`} title={crown.title} data-testid={`block-crown-${block.level}`}>👑</span>
+                    <span className={`absolute -top-2 -left-2 text-lg ${crown.color} drop-shadow`} title={getLevelLabel(t, block.level)} data-testid={`block-crown-${block.level}`}>👑</span>
                   )}
                   <span className="font-medium text-sm leading-tight">{block.title}</span>
                   <StatusBadge status={status} />
                 </div>
-                {isEditor && editMode && ["top","right","bottom","left"].map((side) => {
+                {isEditor && editMode && ["top", "right", "bottom", "left"].map((side) => {
                   const pos = {
                     top: { left: "50%", top: -8, marginLeft: -8 },
                     right: { right: -8, top: "50%", marginTop: -8 },
@@ -377,7 +402,7 @@ export default function RoadmapCanvas({
                     />
                   );
                 })}
-                {isEditor && editMode && ["nw","ne","sw","se"].map((corner) => {
+                {isEditor && editMode && ["nw", "ne", "sw", "se"].map((corner) => {
                   const pos = {
                     nw: { left: -6, top: -6 },
                     ne: { right: -6, top: -6 },
@@ -410,18 +435,18 @@ export default function RoadmapCanvas({
             className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
             data-testid="ctx-add-block"
             onClick={() => { onAddBlockAt?.(menu.canvas.x - 110, menu.canvas.y - 22); setMenu(null); }}
-          >+ Add block here</button>
+          >{t("canvas.addBlockHere")}</button>
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
             data-testid="ctx-add-group"
             onClick={() => { onAddGroupAt?.(menu.canvas.x - 160, menu.canvas.y - 90); setMenu(null); }}
-          >+ Add group here</button>
+          >{t("canvas.addGroupHere")}</button>
         </div>
       )}
 
       {isEditor && editMode && (
         <div className="mt-2 text-xs text-slate-500 font-mono">
-          Tip: drag side handles to link · drag corners to resize · hold SHIFT to snap to the 24px grid.
+          {t("canvas.tip")}
         </div>
       )}
     </div>

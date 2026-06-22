@@ -1,0 +1,38 @@
+{
+  "roles": {
+    "admin": "Admin",
+    "editor": "Éditeur"
+  },
+  "roadmapStatus": {
+    "draft": "Brouillon",
+    "published": "Publié",
+    "archived": "Archivé"
+  },
+  "roadmaps": {
+    "title": "Gérer les roadmaps",
+    "description": "Créez, publiez, archivez et supprimez des roadmaps. Les changements de tags et de niveau sont enregistrés automatiquement.",
+    "newRoadmap": "Nouvelle roadmap",
+    "createRoadmap": "Créer une roadmap",
+    "coverEmoji": "Emoji de couverture",
+    "slug": "Slug (a-z, 0-9, tiret)",
+    "titleField": "Titre",
+    "descriptionField": "Description",
+    "level": "Niveau",
+    "initialStatus": "Statut initial",
+    "tags": "Tags (séparés par des virgules)",
+    "tagsPlaceholder": "ex. web, react, css",
+    "metaTagsPlaceholder": "tags, séparés par des virgules",
+    "saved": "enregistré",
+    "autoSaves": "enregistrement auto",
+    "deleteConfirm": "Supprimer la roadmap \"{{title}}\" et tous ses blocs/progrès ? Cette action est irréversible."
+  },
+  "users": {
+    "eyebrow": "// Admin",
+    "title": "Gestion des utilisateurs",
+    "description": "Promouvez des utilisateurs en éditeurs/admins ou supprimez les comptes inactifs.",
+    "name": "Nom",
+    "email": "Email",
+    "role": "Rôle",
+    "deleteConfirm": "Supprimer l'utilisateur \"{{email}}\" ? Cette action est irréversible."
+  }
+}

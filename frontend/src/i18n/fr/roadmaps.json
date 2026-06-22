@@ -1,0 +1,148 @@
+{
+  "home": {
+    "eyebrow": "// Apprendre n'importe quoi, dans le bon ordre",
+    "title": "Construisez vos feuilles de route et partagez les !",
+    "description": "Choisissez une feuille de route. Avancez bloc par bloc. Suivez chaque étape avec votre progression personnelle.",
+    "browseRoadmaps": "Parcourir",
+    "createFreeAccount": "Créer un compte gratuit",
+    "featuredRoadmaps": "Roadmaps mises en avant",
+    "viewAll": "Voir tout ->",
+    "features": {
+      "orderedPaths": {
+        "title": "Parcours ordonnés",
+        "body": "Chaque feuille de route est une suite de blocs. Plus besoin de deviner l'étape suivante."
+      },
+      "deepBlockContent": {
+        "title": "Blocs détaillés",
+        "body": "Chaque bloc contient des notes détaillées, des ressources recommandées et une durée estimée."
+      },
+      "trackProgress": {
+        "title": "Suivez votre progression",
+        "body": "Marquez les blocs comme en cours ou terminés. Votre parcours est sauvegardé par compte."
+      }
+    }
+  },
+  "levels": {
+    "all": "Tous les niveaux",
+    "beginner": "Débutant",
+    "intermediate": "Intermédiaire",
+    "advanced": "Avancé",
+    "mixed": "Mixte",
+    "none": "- aucun -"
+  },
+  "badges": {
+    "blocks_one": "{{count}} bloc",
+    "blocks_other": "{{count}} blocs",
+    "inProgress_one": "{{count}} en cours",
+    "inProgress_other": "{{count}} en cours"
+  },
+  "list": {
+    "eyebrow": "// Tout parcourir",
+    "title": "Roadmaps",
+    "description": "Des parcours d'apprentissage publiés sur le frontend, le backend, le devops et plus encore.",
+    "searchPlaceholder": "Rechercher une roadmap par titre ou description...",
+    "clearFilters": "Effacer les filtres",
+    "empty": "Aucune roadmap ne correspond à vos filtres."
+  },
+  "detail": {
+    "loading": "Chargement de la roadmap...",
+    "allRoadmaps": "Toutes les roadmaps",
+    "progressCount": "{{completed}}/{{total}} terminés",
+    "viewer": "Lecture",
+    "editCanvas": "Modifier le canvas",
+    "login": "Se connecter",
+    "createAccount": "créer un compte",
+    "trackProgressSuffix": "pour suivre votre progression.",
+    "deleteLinkConfirm": "Supprimer ce lien ?",
+    "deleteBlockConfirm": "Supprimer le bloc \"{{title}}\" ?",
+    "deleteResourceConfirm": "Supprimer cette ressource ?"
+  },
+  "linkPanel": {
+    "title": "Propriétés du lien",
+    "labelOptional": "Libellé (optionnel)",
+    "labelPlaceholder": "ex. recommandé",
+    "style": "Style",
+    "styles": {
+      "solid": "Plein",
+      "dashed": "Tireté",
+      "dotted": "Pointillé"
+    },
+    "thickness": "Épaisseur",
+    "thicknesses": {
+      "small": "Fine",
+      "medium": "Moyenne",
+      "large": "Large"
+    },
+    "color": "Couleur",
+    "fromSide": "Depuis le côté",
+    "toSide": "Vers le côté",
+    "changesSaveAutomatically": "Les changements sont enregistrés automatiquement."
+  },
+  "blockPanel": {
+    "status": {
+      "not_started": "Non commencé",
+      "in_progress": "En cours",
+      "completed": "Terminé"
+    },
+    "resourceKinds": {
+      "article": "Article",
+      "video": "Vidéo",
+      "docs": "Docs",
+      "course": "Cours"
+    },
+    "styles": {
+      "primary": "Principal (jaune)",
+      "alternative": "Alternatif (orange)",
+      "optional": "Optionnel (violet)",
+      "label": "Libellé (sans bordure)"
+    },
+    "positions": {
+      "top": "Haut",
+      "bottom": "Bas",
+      "left": "Gauche",
+      "right": "Droite"
+    },
+    "aligns": {
+      "left": "Gauche",
+      "center": "Centre",
+      "right": "Droite"
+    },
+    "labelOptional": "Libellé (optionnel)",
+    "backgroundColor": "Couleur de fond",
+    "labelPosition": "Position du libellé",
+    "textAlignment": "Alignement du texte",
+    "saving": "Enregistrement...",
+    "autoSaves": "Enregistrement automatique pendant la saisie",
+    "deleteGroup": "Supprimer le groupe",
+    "deleteBlock": "Supprimer le bloc",
+    "title": "Titre",
+    "shortDescription": "Description courte",
+    "detailedContent": "Contenu détaillé",
+    "markdownHelp": "Supporte Markdown - titres, **gras**, listes, [liens](url), `code`, tableaux...",
+    "level": "Niveau",
+    "duration": "Durée",
+    "durationPlaceholder": "ex. 4h",
+    "blockStyle": "Style du bloc",
+    "resources": "Ressources",
+    "add": "Ajouter",
+    "noResources": "Aucune ressource pour le moment. Ajoutez des liens vers des docs, articles, vidéos ou cours.",
+    "overview": "Aperçu",
+    "updateProgress": "Mettre à jour la progression",
+    "reset": "Réinitialiser",
+    "doing": "En cours",
+    "done": "Fait",
+    "loginToTrack": "Connectez-vous pour suivre votre progression sur ce bloc.",
+    "dragToReorderResource": "Glisser pour réordonner la ressource",
+    "resourceLabel": "Libellé",
+    "deleteResource": "Supprimer la ressource"
+  },
+  "canvas": {
+    "editorMode": "Mode éditeur",
+    "addBlock": "Ajouter un bloc",
+    "addGroup": "Ajouter un groupe",
+    "toolbarHint": "double-cliquez dans une zone vide | glissez les poignées latérales pour lier | glissez les coins pour redimensionner | maintenez SHIFT pour aligner sur la grille",
+    "addBlockHere": "+ Ajouter un bloc ici",
+    "addGroupHere": "+ Ajouter un groupe ici",
+    "tip": "Astuce : glissez les poignées latérales pour lier | glissez les coins pour redimensionner | maintenez SHIFT pour aligner sur la grille de 24 px."
+  }
+}

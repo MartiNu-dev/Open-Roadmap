@@ -60,6 +60,10 @@ class ResourceUpdateIn(BaseModel):
     order_index: Optional[int] = None
 
 
+class ResourceReorderIn(BaseModel):
+    resource_ids: List[str] = Field(min_length=1)
+
+
 class BlockOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

@@ -1,44 +1,36 @@
-/*
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
-const REMARK_PLUGINS = [remarkGfm];
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  getAlignmentLabel,
+  getBlockStyleLabel,
+  getLevelLabel,
+  getPositionLabel,
+  getProgressStatusLabel,
+  getResourceKindLabel,
+} from "@/i18n/formatters";
 import { Circle, Loader2, Check, ExternalLink, BookOpen, Video, FileText, Trash2, Plus, GripVertical } from "lucide-react";
 
-const STATUS_LABEL = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-};
-
+const REMARK_PLUGINS = [remarkGfm];
 const RES_ICON = { article: FileText, video: Video, docs: BookOpen, course: BookOpen };
 const RES_KINDS = ["article", "video", "docs", "course"];
-
-const STYLE_OPTIONS = [
-  { value: "primary", label: "Primary (yellow)" },
-  { value: "alternative", label: "Alternative (orange)" },
-  { value: "optional", label: "Optional (violet)" },
-  { value: "label", label: "Label (no border)" },
-];
-
+const STYLE_OPTIONS = ["primary", "alternative", "optional", "label"];
 const LEVEL_OPTIONS = ["", "beginner", "intermediate", "advanced"];
-
 const GROUP_BG_PRESETS = ["#0f172a", "#1e293b", "#334155", "#1e3a8a", "#065f46", "#7c2d12", "#581c87", "#9f1239"];
-const POSITIONS = [
-  { value: "top", label: "Top" },
-  { value: "bottom", label: "Bottom" },
-];
-const ALIGNS = [
-  { value: "left", label: "Left" },
-  { value: "center", label: "Center" },
-  { value: "right", label: "Right" },
-];
+const POSITIONS = ["top", "bottom"];
+const ALIGNS = ["left", "center", "right"];
+
+function sortResources(resources = []) {
+  return [...resources].sort((a, b) =>
+    (a.order_index ?? 0) - (b.order_index ?? 0) || a.id.localeCompare(b.id)
+  );
+}
 
 function reorderResourceIds(resourceIds, draggedId, targetId, position) {
   if (!draggedId || !targetId || draggedId === targetId) return resourceIds;
@@ -65,6 +57,7 @@ function ResourceRow({
   isDropBefore,
   isDropAfter,
   canReorder,
+  t,
 }) {
   const [draft, setDraft] = useState({
     label: resource.label,
@@ -73,7 +66,6 @@ function ResourceRow({
   });
   const initialRef = useRef(resource.id);
 
-  // Re-sync when a different resource is shown in the same slot
   useEffect(() => {
     if (initialRef.current !== resource.id) {
       initialRef.current = resource.id;
@@ -81,7 +73,6 @@ function ResourceRow({
     }
   }, [resource.id, resource.label, resource.url, resource.kind]);
 
-  // Debounced auto-save when fields change
   useEffect(() => {
     const changed =
       draft.label !== resource.label ||
@@ -89,10 +80,10 @@ function ResourceRow({
       draft.kind !== resource.kind;
     if (!changed) return;
     if (!draft.label.trim() || !draft.url.trim()) return;
-    const t = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       onUpdate(resource.id, draft);
     }, 500);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timeoutId);
   }, [draft, resource.id, resource.label, resource.url, resource.kind, onUpdate]);
 
   return (
@@ -115,56 +106,61 @@ function ResourceRow({
             canReorder ? "cursor-grab hover:border-slate-300 hover:text-slate-700 active:cursor-grabbing" : "cursor-not-allowed opacity-50"
           }`}
           data-testid={`resource-drag-handle-${resource.id}`}
-          title="Drag to reorder resource"
-          aria-label="Drag to reorder resource"
+          title={t("blockPanel.dragToReorderResource")}
+          aria-label={t("blockPanel.dragToReorderResource")}
         >
           <GripVertical size={16} />
         </button>
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex gap-2">
-        <Input
-          value={draft.label}
-          placeholder="Label"
-          onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
-          data-testid={`resource-label-${resource.id}`}
-        />
-        <select
-          className="h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
-          value={draft.kind}
-          onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value }))}
-          data-testid={`resource-kind-${resource.id}`}
-        >
-          {RES_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-        </select>
-      </div>
-      <div className="flex gap-2">
-        <Input
-          value={draft.url}
-          placeholder="https://…"
-          onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
-          data-testid={`resource-url-${resource.id}`}
-        />
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onDelete(resource.id)}
-          data-testid={`resource-delete-${resource.id}`}
-          title="Delete resource"
-        >
-          <Trash2 size={14} className="text-red-600" />
-        </Button>
+            <Input
+              value={draft.label}
+              placeholder={t("blockPanel.resourceLabel")}
+              onChange={(e) => setDraft((current) => ({ ...current, label: e.target.value }))}
+              data-testid={`resource-label-${resource.id}`}
+            />
+            <select
+              className="h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+              value={draft.kind}
+              onChange={(e) => setDraft((current) => ({ ...current, kind: e.target.value }))}
+              data-testid={`resource-kind-${resource.id}`}
+            >
+              {RES_KINDS.map((kind) => <option key={kind} value={kind}>{getResourceKindLabel(t, kind)}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={draft.url}
+              placeholder="https://..."
+              onChange={(e) => setDraft((current) => ({ ...current, url: e.target.value }))}
+              data-testid={`resource-url-${resource.id}`}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onDelete(resource.id)}
+              data-testid={`resource-delete-${resource.id}`}
+              title={t("blockPanel.deleteResource")}
+            >
+              <Trash2 size={14} className="text-red-600" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-export default function BlockSidePanel({
+export default function BlockSidePanelDnD({
   open, onOpenChange, block, progress, onStatusChange, canEdit,
   canManage, onSave, onDelete, saving,
-  onAddResource, onUpdateResource, onDeleteResource,
+  onAddResource, onUpdateResource, onDeleteResource, onReorderResources,
 }) {
+  const { t } = useTranslation(["roadmaps", "common"]);
   const [form, setForm] = useState(null);
   const initialBlockIdRef = useRef(null);
+  const [draggedResourceId, setDraggedResourceId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
 
   useEffect(() => {
     if (block) {
@@ -183,7 +179,11 @@ export default function BlockSidePanel({
     }
   }, [block?.id]);
 
-  // Auto-save on edits (debounced) — only when in manage mode
+  useEffect(() => {
+    setDraggedResourceId(null);
+    setDropTarget(null);
+  }, [block?.id, open]);
+
   useEffect(() => {
     if (!form || !block || !canManage) return;
     if (initialBlockIdRef.current !== block.id) return;
@@ -197,32 +197,74 @@ export default function BlockSidePanel({
       || (form.label_position !== (block.label_position || "bottom"))
       || (form.label_align !== (block.label_align || "center"));
     if (!changed) return;
-    // Group can have empty title; block requires title
+
     const isGroup = block.kind === "group";
     if (!isGroup && (!form.title || !form.title.trim())) return;
     const safeTitle = isGroup ? (form.title || "Group") : form.title;
-    const t = setTimeout(() => onSave?.({ ...form, title: safeTitle }), 500);
-    return () => clearTimeout(t);
-  }, [form, canManage]);
+    const timeoutId = setTimeout(() => onSave?.({ ...form, title: safeTitle }), 500);
+    return () => clearTimeout(timeoutId);
+  }, [form, canManage, block, onSave]);
 
   if (!block || !form) return null;
-  const status = progress?.status || "not_started";
 
-  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const status = progress?.status || "not_started";
+  const resources = sortResources(block.resources || []);
+  const canReorderResources = canManage && resources.length > 1 && typeof onReorderResources === "function";
+
+  const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const clearResourceDrag = () => {
+    setDraggedResourceId(null);
+    setDropTarget(null);
+  };
+  const getDropPosition = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+  };
+  const handleResourceDragStart = (event, resourceId) => {
+    if (!canReorderResources) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", resourceId);
+    setDraggedResourceId(resourceId);
+    setDropTarget(null);
+  };
+  const handleResourceDragOver = (event, resourceId) => {
+    if (!draggedResourceId || !canReorderResources) return;
+    event.preventDefault();
+    if (draggedResourceId === resourceId) {
+      setDropTarget(null);
+      return;
+    }
+    const position = getDropPosition(event);
+    setDropTarget((prev) => (
+      prev?.resourceId === resourceId && prev?.position === position
+        ? prev
+        : { resourceId, position }
+    ));
+  };
+  const handleResourceDrop = (event, resourceId) => {
+    if (!canReorderResources) return;
+    event.preventDefault();
+    const activeId = draggedResourceId || event.dataTransfer.getData("text/plain");
+    const position = getDropPosition(event);
+    const orderedIds = reorderResourceIds(resources.map((resource) => resource.id), activeId, resourceId, position);
+    clearResourceDrag();
+    if (orderedIds.every((id, index) => id === resources[index]?.id)) return;
+    onReorderResources(block.id, orderedIds);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:w-[480px] sm:max-w-[480px] overflow-y-auto p-0 flex flex-col" data-testid="side-panel">
-        <div className="p-6 border-b border-slate-200">
+        <div className="border-b border-slate-200 p-6">
           <SheetHeader>
-            <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
-              <span className="px-2 py-0.5 rounded bg-slate-100">{block.level}</span>
+            <div className="mb-2 flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-500">
+              {block.level && <span className="rounded bg-slate-100 px-2 py-0.5">{getLevelLabel(t, block.level)}</span>}
               {block.estimated_duration && <span>~ {block.estimated_duration}</span>}
               <span className={
                 status === "completed" ? "text-emerald-600"
                 : status === "in_progress" ? "text-blue-600"
                 : "text-slate-500"
-              }>{STATUS_LABEL[status]}</span>
+              }>{getProgressStatusLabel(t, status)}</span>
             </div>
             <SheetTitle className="font-display text-2xl text-left text-slate-900">{block.title}</SheetTitle>
             {block.short_description && (
@@ -236,21 +278,21 @@ export default function BlockSidePanel({
             block.kind === "group" ? (
               <div className="space-y-4" data-testid="group-editor-form">
                 <div>
-                  <Label>Label (optional)</Label>
+                  <Label>{t("blockPanel.labelOptional")}</Label>
                   <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-group-title" />
                 </div>
                 <div>
-                  <Label>Background color</Label>
+                  <Label>{t("blockPanel.backgroundColor")}</Label>
                   <div className="flex flex-wrap gap-2 mt-1" data-testid="group-bg-presets">
-                    {GROUP_BG_PRESETS.map((c) => (
+                    {GROUP_BG_PRESETS.map((color) => (
                       <button
-                        key={c}
+                        key={color}
                         type="button"
-                        onClick={() => setField("bg_color", c)}
-                        className={`w-7 h-7 rounded-md border-2 transition ${form.bg_color === c ? "border-slate-900 scale-110" : "border-slate-200"}`}
-                        style={{ background: c }}
-                        data-testid={`group-bg-${c.replace("#", "")}`}
-                        aria-label={`Color ${c}`}
+                        onClick={() => setField("bg_color", color)}
+                        className={`w-7 h-7 rounded-md border-2 transition ${form.bg_color === color ? "border-slate-900 scale-110" : "border-slate-200"}`}
+                        style={{ background: color }}
+                        data-testid={`group-bg-${color.replace("#", "")}`}
+                        aria-label={`${t("blockPanel.backgroundColor")} ${color}`}
                       />
                     ))}
                     <input
@@ -264,28 +306,28 @@ export default function BlockSidePanel({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Label position</Label>
+                    <Label>{t("blockPanel.labelPosition")}</Label>
                     <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
                       value={form.label_position}
                       onChange={(e) => setField("label_position", e.target.value)}
                       data-testid="edit-group-label-position">
-                      {POSITIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                      {POSITIONS.map((position) => <option key={position} value={position}>{getPositionLabel(t, position)}</option>)}
                     </select>
                   </div>
                   <div>
-                    <Label>Text alignment</Label>
+                    <Label>{t("blockPanel.textAlignment")}</Label>
                     <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
                       value={form.label_align}
                       onChange={(e) => setField("label_align", e.target.value)}
                       data-testid="edit-group-label-align">
-                      {ALIGNS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                      {ALIGNS.map((align) => <option key={align} value={align}>{getAlignmentLabel(t, align)}</option>)}
                     </select>
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2 items-center">
-                  <span className="text-xs text-slate-500 italic">{saving ? "Saving…" : "Auto-saves as you type"}</span>
+                  <span className="text-xs text-slate-500 italic">{saving ? t("blockPanel.saving") : t("blockPanel.autoSaves")}</span>
                   <Button variant="outline" onClick={onDelete} data-testid="edit-group-delete-btn" className="ml-auto">
-                    <Trash2 size={14} className="mr-1 text-red-600" /> Delete group
+                    <Trash2 size={14} className="mr-1 text-red-600" /> {t("blockPanel.deleteGroup")}
                   </Button>
                 </div>
               </div>
@@ -293,68 +335,77 @@ export default function BlockSidePanel({
               <>
                 <div className="space-y-4" data-testid="block-editor-form">
                   <div>
-                    <Label>Title</Label>
+                    <Label>{t("blockPanel.title")}</Label>
                     <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-block-title" />
                   </div>
                   <div>
-                    <Label>Short description</Label>
+                    <Label>{t("blockPanel.shortDescription")}</Label>
                     <Input value={form.short_description} onChange={(e) => setField("short_description", e.target.value)} data-testid="edit-block-short" />
                   </div>
                   <div>
-                    <Label>Detailed content</Label>
+                    <Label>{t("blockPanel.detailedContent")}</Label>
                     <Textarea rows={5} value={form.detailed_content} onChange={(e) => setField("detailed_content", e.target.value)} data-testid="edit-block-detail" />
-                    <p className="text-xs text-slate-500 mt-1">Supports <span className="font-mono">Markdown</span> — headings, **bold**, lists, [links](url), `code`, tables…</p>
+                    <p className="text-xs text-slate-500 mt-1">{t("blockPanel.markdownHelp")}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Level</Label>
+                      <Label>{t("blockPanel.level")}</Label>
                       <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
                         value={form.level} onChange={(e) => setField("level", e.target.value)} data-testid="edit-block-level">
-                        {LEVEL_OPTIONS.map((l) => <option key={l || "none"} value={l}>{l || "— none —"}</option>)}
+                        {LEVEL_OPTIONS.map((level) => <option key={level || "none"} value={level}>{getLevelLabel(t, level)}</option>)}
                       </select>
                     </div>
                     <div>
-                      <Label>Duration</Label>
-                      <Input value={form.estimated_duration} onChange={(e) => setField("estimated_duration", e.target.value)} placeholder="e.g. 4h" data-testid="edit-block-duration" />
+                      <Label>{t("blockPanel.duration")}</Label>
+                      <Input value={form.estimated_duration} onChange={(e) => setField("estimated_duration", e.target.value)} placeholder={t("blockPanel.durationPlaceholder")} data-testid="edit-block-duration" />
                     </div>
                   </div>
                   <div>
-                    <Label>Block style</Label>
+                    <Label>{t("blockPanel.blockStyle")}</Label>
                     <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
                       value={form.node_style} onChange={(e) => setField("node_style", e.target.value)} data-testid="edit-block-style">
-                      {STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {STYLE_OPTIONS.map((style) => <option key={style} value={style}>{getBlockStyleLabel(t, style)}</option>)}
                     </select>
                   </div>
                   <div className="flex gap-2 pt-2 items-center">
-                    <span className="text-xs text-slate-500 italic">{saving ? "Saving…" : "Auto-saves as you type"}</span>
+                    <span className="text-xs text-slate-500 italic">{saving ? t("blockPanel.saving") : t("blockPanel.autoSaves")}</span>
                     <Button variant="outline" onClick={onDelete} data-testid="edit-block-delete-btn" className="ml-auto">
-                      <Trash2 size={14} className="mr-1 text-red-600" /> Delete block
+                      <Trash2 size={14} className="mr-1 text-red-600" /> {t("blockPanel.deleteBlock")}
                     </Button>
                   </div>
                 </div>
 
                 <div className="space-y-3" data-testid="block-editor-resources">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500">Resources</h4>
+                    <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500">{t("blockPanel.resources")}</h4>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onAddResource?.(block.id)}
                       data-testid="resource-add-btn"
                     >
-                      <Plus size={14} className="mr-1" /> Add
+                      <Plus size={14} className="mr-1" /> {t("blockPanel.add")}
                     </Button>
                   </div>
-                  {(block.resources?.length ?? 0) === 0 ? (
-                    <p className="text-xs text-slate-500 italic">No resources yet. Add links to docs, articles, videos or courses.</p>
+                  {resources.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic">{t("blockPanel.noResources")}</p>
                   ) : (
                     <div className="space-y-2">
-                      {block.resources.map((r) => (
+                      {resources.map((resource) => (
                         <ResourceRow
-                          key={r.id}
-                          resource={r}
+                          key={resource.id}
+                          resource={resource}
                           onUpdate={onUpdateResource}
                           onDelete={onDeleteResource}
+                          onDragStart={(event) => handleResourceDragStart(event, resource.id)}
+                          onDragOver={(event) => handleResourceDragOver(event, resource.id)}
+                          onDrop={(event) => handleResourceDrop(event, resource.id)}
+                          onDragEnd={clearResourceDrag}
+                          isDragging={draggedResourceId === resource.id}
+                          isDropBefore={dropTarget?.resourceId === resource.id && dropTarget?.position === "before"}
+                          isDropAfter={dropTarget?.resourceId === resource.id && dropTarget?.position === "after"}
+                          canReorder={canReorderResources}
+                          t={t}
                         />
                       ))}
                     </div>
@@ -366,24 +417,24 @@ export default function BlockSidePanel({
             <>
               {block.detailed_content && (
                 <div>
-                  <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">Overview</h4>
+                  <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">{t("blockPanel.overview")}</h4>
                   <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed" data-testid="block-content-markdown">
                     <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{block.detailed_content}</ReactMarkdown>
                   </div>
                 </div>
               )}
-              {block.resources?.length > 0 && (
+              {resources.length > 0 && (
                 <div>
-                  <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">Resources</h4>
+                  <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">{t("blockPanel.resources")}</h4>
                   <ul className="space-y-2" data-testid="side-panel-resources">
-                    {block.resources.map((r) => {
-                      const Icon = RES_ICON[r.kind] || FileText;
+                    {resources.map((resource) => {
+                      const Icon = RES_ICON[resource.kind] || FileText;
                       return (
-                        <li key={r.id}>
-                          <a href={r.url} target="_blank" rel="noopener noreferrer"
+                        <li key={resource.id}>
+                          <a href={resource.url} target="_blank" rel="noopener noreferrer"
                             className="group flex items-center gap-3 border border-slate-200 rounded-md p-3 hover:border-slate-900 transition-colors">
                             <Icon size={16} className="text-slate-500 shrink-0" />
-                            <span className="flex-1 text-sm text-slate-700 truncate">{r.label}</span>
+                            <span className="flex-1 text-sm text-slate-700 truncate">{resource.label}</span>
                             <ExternalLink size={14} className="text-slate-400 group-hover:text-slate-900" />
                           </a>
                         </li>
@@ -398,27 +449,25 @@ export default function BlockSidePanel({
 
         {!canManage && (canEdit ? (
           <div className="border-t border-slate-200 p-6 bg-slate-50 sticky bottom-0">
-            <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">Update progress</h4>
+            <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">{t("blockPanel.updateProgress")}</h4>
             <div className="grid grid-cols-3 gap-2">
               <Button variant={status === "not_started" ? "default" : "outline"} size="sm" onClick={() => onStatusChange("not_started")} data-testid="status-btn-not-started" className="rounded-md">
-                <Circle size={14} className="mr-1" /> Reset
+                <Circle size={14} className="mr-1" /> {t("blockPanel.reset")}
               </Button>
               <Button variant={status === "in_progress" ? "default" : "outline"} size="sm" onClick={() => onStatusChange("in_progress")} data-testid="status-btn-in-progress" className={`rounded-md ${status === "in_progress" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}`}>
-                <Loader2 size={14} className="mr-1" /> Doing
+                <Loader2 size={14} className="mr-1" /> {t("blockPanel.doing")}
               </Button>
               <Button variant={status === "completed" ? "default" : "outline"} size="sm" onClick={() => onStatusChange("completed")} data-testid="status-btn-complete" className={`rounded-md ${status === "completed" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}`}>
-                <Check size={14} className="mr-1" /> Done
+                <Check size={14} className="mr-1" /> {t("blockPanel.done")}
               </Button>
             </div>
           </div>
         ) : (
           <div className="border-t border-slate-200 p-6 bg-slate-50 text-sm text-slate-600">
-            Log in to track your progress on this block.
+            {t("blockPanel.loginToTrack")}
           </div>
         ))}
       </SheetContent>
     </Sheet>
   );
 }
-*/
-export { default } from "./BlockSidePanelDnD";

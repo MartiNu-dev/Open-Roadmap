@@ -1,0 +1,36 @@
+{
+  "appName": "Open Roadmap",
+  "loading": "Chargement...",
+  "language": {
+    "label": "Langue",
+    "en": "Anglais",
+    "fr": "Français"
+  },
+  "nav": {
+    "roadmaps": "Roadmaps",
+    "dashboard": "Tableau de bord",
+    "manageRoadmaps": "Gérer les roadmaps",
+    "users": "Utilisateurs",
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "getStarted": "Commencer"
+  },
+  "roles": {
+    "admin": "Admin",
+    "editor": "Éditeur",
+    "user": "Utilisateur"
+  },
+  "errors": {
+    "generic": "Une erreur est survenue"
+  },
+  "actions": {
+    "open": "Ouvrir",
+    "create": "Créer",
+    "delete": "Supprimer",
+    "clear": "Effacer",
+    "add": "Ajouter"
+  },
+  "connectors": {
+    "or": "ou"
+  }
+}

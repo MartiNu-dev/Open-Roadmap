@@ -1,0 +1,148 @@
+{
+  "home": {
+    "eyebrow": "// Learn anything, in order",
+    "title": "Community-driven roadmaps to guide your career as a developer.",
+    "description": "Pick a path. Work through ordered blocks. Track every step with personal progress. No fluff, no AI guesses - just curated knowledge you can ship.",
+    "browseRoadmaps": "Browse roadmaps",
+    "createFreeAccount": "Create free account",
+    "featuredRoadmaps": "Featured roadmaps",
+    "viewAll": "View all ->",
+    "features": {
+      "orderedPaths": {
+        "title": "Ordered paths",
+        "body": "Every roadmap is a sequence of blocks. No more guessing what comes next."
+      },
+      "deepBlockContent": {
+        "title": "Deep block content",
+        "body": "Each block has detailed notes, recommended resources and an estimated duration."
+      },
+      "trackProgress": {
+        "title": "Track your progress",
+        "body": "Mark blocks as in progress or complete. Your journey is saved per-account."
+      }
+    }
+  },
+  "levels": {
+    "all": "All levels",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced",
+    "mixed": "Mixed",
+    "none": "- none -"
+  },
+  "badges": {
+    "blocks_one": "{{count}} block",
+    "blocks_other": "{{count}} blocks",
+    "inProgress_one": "{{count}} in progress",
+    "inProgress_other": "{{count}} in progress"
+  },
+  "list": {
+    "eyebrow": "// Browse all",
+    "title": "Roadmaps",
+    "description": "Published learning paths covering frontend, backend, devops and more.",
+    "searchPlaceholder": "Search roadmaps by title or description...",
+    "clearFilters": "Clear filters",
+    "empty": "No roadmaps match your filters."
+  },
+  "detail": {
+    "loading": "Loading roadmap...",
+    "allRoadmaps": "All roadmaps",
+    "progressCount": "{{completed}}/{{total}} completed",
+    "viewer": "Viewer",
+    "editCanvas": "Edit canvas",
+    "login": "Log in",
+    "createAccount": "create an account",
+    "trackProgressSuffix": "to track your progress.",
+    "deleteLinkConfirm": "Delete this link?",
+    "deleteBlockConfirm": "Delete block \"{{title}}\"?",
+    "deleteResourceConfirm": "Delete this resource?"
+  },
+  "linkPanel": {
+    "title": "Link properties",
+    "labelOptional": "Label (optional)",
+    "labelPlaceholder": "e.g. recommended",
+    "style": "Style",
+    "styles": {
+      "solid": "Solid",
+      "dashed": "Dashed",
+      "dotted": "Dotted"
+    },
+    "thickness": "Thickness",
+    "thicknesses": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
+    },
+    "color": "Color",
+    "fromSide": "From side",
+    "toSide": "To side",
+    "changesSaveAutomatically": "Changes save automatically."
+  },
+  "blockPanel": {
+    "status": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "completed": "Completed"
+    },
+    "resourceKinds": {
+      "article": "Article",
+      "video": "Video",
+      "docs": "Docs",
+      "course": "Course"
+    },
+    "styles": {
+      "primary": "Primary (yellow)",
+      "alternative": "Alternative (orange)",
+      "optional": "Optional (violet)",
+      "label": "Label (no border)"
+    },
+    "positions": {
+      "top": "Top",
+      "bottom": "Bottom",
+      "left": "Left",
+      "right": "Right"
+    },
+    "aligns": {
+      "left": "Left",
+      "center": "Center",
+      "right": "Right"
+    },
+    "labelOptional": "Label (optional)",
+    "backgroundColor": "Background color",
+    "labelPosition": "Label position",
+    "textAlignment": "Text alignment",
+    "saving": "Saving...",
+    "autoSaves": "Auto-saves as you type",
+    "deleteGroup": "Delete group",
+    "deleteBlock": "Delete block",
+    "title": "Title",
+    "shortDescription": "Short description",
+    "detailedContent": "Detailed content",
+    "markdownHelp": "Supports Markdown - headings, **bold**, lists, [links](url), `code`, tables...",
+    "level": "Level",
+    "duration": "Duration",
+    "durationPlaceholder": "e.g. 4h",
+    "blockStyle": "Block style",
+    "resources": "Resources",
+    "add": "Add",
+    "noResources": "No resources yet. Add links to docs, articles, videos or courses.",
+    "overview": "Overview",
+    "updateProgress": "Update progress",
+    "reset": "Reset",
+    "doing": "Doing",
+    "done": "Done",
+    "loginToTrack": "Log in to track your progress on this block.",
+    "dragToReorderResource": "Drag to reorder resource",
+    "resourceLabel": "Label",
+    "deleteResource": "Delete resource"
+  },
+  "canvas": {
+    "editorMode": "Editor mode",
+    "addBlock": "Add block",
+    "addGroup": "Add group",
+    "toolbarHint": "double-click empty area | drag side handles to link | drag corners to resize | hold SHIFT to snap to grid",
+    "addBlockHere": "+ Add block here",
+    "addGroupHere": "+ Add group here",
+    "tip": "Tip: drag side handles to link | drag corners to resize | hold SHIFT to snap to the 24px grid."
+  }
+}

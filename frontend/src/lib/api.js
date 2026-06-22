@@ -1,4 +1,5 @@
 import axios from "axios";
+import i18n from "@/i18n";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API_BASE = `${BACKEND_URL}/api`;
@@ -30,9 +31,9 @@ api.interceptors.request.use((config) => {
 
 export default api;
 
-export function formatApiError(err) {
+export function formatApiError(err, fallbackMessage = i18n.t("common:errors.generic")) {
   const detail = err?.response?.data?.detail;
-  if (!detail) return err?.message || "Something went wrong";
+  if (!detail) return err?.message || fallbackMessage;
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {
     return detail

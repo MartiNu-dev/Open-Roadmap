@@ -202,6 +202,38 @@ class TestResourcesCRUD:
         br2 = next(b for b in r7.json()["blocks"] if b["id"] == block_id)["resources"]
         assert not any(x["id"] == rid for x in br2), "Resource still present after delete"
 
+    def test_editor_can_reorder_resources(self):
+        s, _ = _login(EDITOR)
+        csrf = s.cookies.get("csrf_token")
+        headers = {"X-CSRF-Token": csrf}
+        block_id, resources = _get_first_block_id(s)
+        assert len(resources) >= 2, "Need at least 2 resources to test reorder"
+
+        original_ids = [res["id"] for res in resources]
+        reordered_ids = list(reversed(original_ids))
+
+        try:
+            r = s.patch(
+                f"{API}/blocks/{block_id}/resources/reorder",
+                json={"resource_ids": reordered_ids},
+                headers=headers,
+            )
+            assert r.status_code == 200, r.text
+            reordered = r.json()
+            assert [res["id"] for res in reordered] == reordered_ids
+            assert [res["order_index"] for res in reordered] == list(range(1, len(reordered_ids) + 1))
+
+            r2 = s.get(f"{API}/roadmaps/frontend")
+            assert r2.status_code == 200, r2.text
+            embedded = next(b for b in r2.json()["blocks"] if b["id"] == block_id)["resources"]
+            assert [res["id"] for res in embedded] == reordered_ids
+        finally:
+            s.patch(
+                f"{API}/blocks/{block_id}/resources/reorder",
+                json={"resource_ids": original_ids},
+                headers=headers,
+            )
+
 
 # ---------- BACKWARDS-COMPAT existing endpoints ----------
 class TestExistingViaCookie:

@@ -107,13 +107,9 @@ P0
 - [x] Roadmap CRUD UI (editor + admin): create / edit / archive / publish
 - [x] Block management UI (CRUD on blocks + resources, reorder)  *(resources CRUD shipped in Phase 6; block reorder still TBD if needed)*
 P1
-- [ ] User profile page (change name, password)
-- [ ] Notes editor on progress entries
 - [x] Filter/search roadmaps by tag/level *(Phase 7)*
 P2
 - [ ] Roadmap tagging system
-- [ ] Public profile pages
-- [ ] Streak / weekly progress widget on dashboard
 - [ ] Refactor `RoadmapCanvas.jsx` into custom hooks (drag, path calc) and fix exhaustive-deps
 
 ## Personas
