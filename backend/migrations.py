@@ -3,6 +3,43 @@ from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
 
+def _ensure_nullable_password_hash(engine: Engine) -> None:
+    insp = inspect(engine)
+    if "users" not in insp.get_table_names():
+        return
+
+    columns = insp.get_columns("users")
+    password_col = next((col for col in columns if col["name"] == "password_hash"), None)
+    if password_col is None or password_col.get("nullable", True):
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text(
+            """
+            CREATE TABLE users__new (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                email VARCHAR NOT NULL,
+                name VARCHAR NOT NULL,
+                password_hash VARCHAR NULL,
+                role VARCHAR NOT NULL DEFAULT 'user',
+                created_at DATETIME NOT NULL
+            )
+            """
+        ))
+        conn.execute(text(
+            """
+            INSERT INTO users__new (id, email, name, password_hash, role, created_at)
+            SELECT id, email, name, password_hash, role, created_at
+            FROM users
+            """
+        ))
+        conn.execute(text("DROP TABLE users"))
+        conn.execute(text("ALTER TABLE users__new RENAME TO users"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)"))
+        conn.execute(text("PRAGMA foreign_keys=ON"))
+
+
 def run_migrations(engine: Engine) -> None:
     insp = inspect(engine)
     cols = {c["name"] for c in insp.get_columns("roadmap_blocks")}
@@ -40,3 +77,4 @@ def run_migrations(engine: Engine) -> None:
         for name, ddl in rm_needed.items():
             if rm_cols and name not in rm_cols:
                 conn.execute(text(f"ALTER TABLE roadmaps ADD COLUMN {name} {ddl}"))
+    _ensure_nullable_password_hash(engine)

@@ -8,9 +8,9 @@ import dashboardEn from "./en/dashboard.json";
 import adminEn from "./en/admin.json";
 import roadmapsEn from "./en/roadmaps.json";
 import commonFr from "./fr/common.json";
-import authFr from "./fr/auth.json";
+import authFr from "./fr/auth.enterprise.json";
 import dashboardFr from "./fr/dashboard.json";
-import adminFr from "./fr/admin.json";
+import adminFr from "./fr/admin.enterprise.json";
 import roadmapsFr from "./fr/roadmaps.json";
 
 export const LOCALE_STORAGE_KEY = "open-roadmap.locale";

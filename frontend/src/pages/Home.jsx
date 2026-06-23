@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import api from "@/lib/api";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Compass, CheckCircle2, Layers } from "lucide-react";
 
@@ -14,6 +15,7 @@ const FEATURE_KEYS = [
 
 export default function Home() {
   const [roadmaps, setRoadmaps] = useState([]);
+  const { authOptions } = useAuth();
   const { t } = useTranslation("roadmaps");
 
   useEffect(() => {
@@ -39,11 +41,13 @@ export default function Home() {
               {t("home.browseRoadmaps")} <ArrowRight size={16} className="ml-2" />
             </Button>
           </Link>
-          <Link to="/register">
-            <Button size="lg" variant="outline" data-testid="home-register-btn" className="rounded-md">
-              {t("home.createFreeAccount")}
-            </Button>
-          </Link>
+          {authOptions.self_register_enabled && (
+            <Link to="/register">
+              <Button size="lg" variant="outline" data-testid="home-register-btn" className="rounded-md">
+                {t("home.createFreeAccount")}
+              </Button>
+            </Link>
+          )}
         </div>
 
         <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6">

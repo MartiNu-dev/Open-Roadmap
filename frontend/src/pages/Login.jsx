@@ -12,7 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const { login } = useAuth();
+  const { login, authOptions, startOidcLogin } = useAuth();
   const { t } = useTranslation("auth");
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,10 +51,27 @@ export default function Login() {
           <Button type="submit" className="w-full" disabled={busy} data-testid="login-submit-btn">
             {busy ? t("login.signingIn") : t("login.signIn")}
           </Button>
+          {authOptions.oidc.enabled && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => startOidcLogin(redirectTo)}
+              data-testid="login-oidc-btn"
+            >
+              {t("login.signInWithOidc", { provider: authOptions.oidc.display_name || "OIDC" })}
+            </Button>
+          )}
         </form>
 
         <p className="mt-6 text-sm text-slate-600">
-          {t("login.noAccount")} <Link to="/register" className="underline font-medium text-slate-900">{t("login.createOne")}</Link>
+          {authOptions.self_register_enabled ? (
+            <>
+              {t("login.noAccount")} <Link to="/register" className="underline font-medium text-slate-900">{t("login.createOne")}</Link>
+            </>
+          ) : (
+            t("login.selfRegisterDisabled")
+          )}
         </p>
       </div>
     </div>

@@ -34,5 +34,55 @@
     "email": "Email",
     "role": "Role",
     "deleteConfirm": "Delete user \"{{email}}\"? This cannot be undone."
+  },
+  "tabs": {
+    "users": "Users",
+    "authentication": "Authentication"
+  },
+  "auth": {
+    "title": "Authentication settings",
+    "description": "Control which sign-in methods are available and configure enterprise SSO.",
+    "saved": "Authentication settings saved.",
+    "clearSecret": "Clear stored secret",
+    "save": "Save settings",
+    "saving": "Saving...",
+    "methods": {
+      "title": "Sign-in methods",
+      "description": "Enable or disable the authentication methods exposed to end users.",
+      "oidcTitle": "OIDC enterprise login",
+      "oidcDescription": "Show a Sign in with SSO button and allow login through your OpenID Connect provider.",
+      "selfRegisterTitle": "Self-registration",
+      "selfRegisterDescription": "Allow visitors to create a local account from the register page."
+    },
+    "oidc": {
+      "title": "OIDC provider",
+      "description": "Configure a single OpenID Connect provider for enterprise deployment.",
+      "configured": "Configured",
+      "incomplete": "Incomplete"
+    },
+    "callbackOverride": {
+      "badge": "Env override",
+      "description": "This callback URL is currently overridden by a backend environment variable."
+    },
+    "fields": {
+      "displayName": "Display name",
+      "issuerUrl": "Issuer URL",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "clientSecretSaved": "Stored secret is kept unless you replace it.",
+      "scopes": "Scopes",
+      "emailClaim": "Email claim",
+      "nameClaim": "Name claim",
+      "roleClaim": "Role claim",
+      "roleValuesUser": "User role values",
+      "roleValuesEditor": "Editor role values",
+      "roleValuesAdmin": "Admin role values",
+      "callbackUrl": "Callback URL"
+    },
+    "secretSource": {
+      "database": "Secret source: database",
+      "environment": "Secret source: environment override",
+      "none": "Secret source: none configured"
+    }
   }
 }

@@ -7,7 +7,7 @@ import { getRoleLabel } from "@/i18n/formatters";
 import { Map, LogOut, User as UserIcon } from "lucide-react";
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, authOptions } = useAuth();
   const { t } = useTranslation("common");
 
   return (
@@ -85,9 +85,11 @@ export default function Navbar() {
               <Link to="/login">
                 <Button variant="ghost" size="sm" data-testid="nav-login-btn">{t("nav.login")}</Button>
               </Link>
-              <Link to="/register">
-                <Button size="sm" data-testid="nav-register-btn">{t("nav.getStarted")}</Button>
-              </Link>
+              {authOptions.self_register_enabled && (
+                <Link to="/register">
+                  <Button size="sm" data-testid="nav-register-btn">{t("nav.getStarted")}</Button>
+                </Link>
+              )}
             </>
           )}
         </div>

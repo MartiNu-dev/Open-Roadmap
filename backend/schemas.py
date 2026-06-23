@@ -34,6 +34,53 @@ class TokenOut(BaseModel):
     user: UserOut
 
 
+class OidcAuthOptionOut(BaseModel):
+    enabled: bool
+    display_name: Optional[str] = None
+
+
+class AuthOptionsOut(BaseModel):
+    local_login_enabled: bool = True
+    self_register_enabled: bool
+    oidc: OidcAuthOptionOut
+
+
+class AuthSettingsOut(BaseModel):
+    self_register_enabled: bool
+    oidc_enabled: bool
+    oidc_display_name: str
+    oidc_issuer_url: str
+    oidc_client_id: str
+    oidc_scopes: str
+    oidc_email_claim: str
+    oidc_name_claim: str
+    oidc_role_claim: str
+    oidc_role_values_user: str
+    oidc_role_values_editor: str
+    oidc_role_values_admin: str
+    has_client_secret: bool
+    secret_source: Literal["database", "environment", "none"]
+    configured: bool
+    callback_url_override: Optional[str] = None
+    callback_url_overridden: bool = False
+
+
+class AuthSettingsUpdateIn(BaseModel):
+    self_register_enabled: bool = True
+    oidc_enabled: bool = False
+    oidc_display_name: str = Field(default="Enterprise SSO", min_length=1, max_length=120)
+    oidc_issuer_url: str = ""
+    oidc_client_id: str = ""
+    client_secret: Optional[str] = None
+    oidc_scopes: str = "openid profile email"
+    oidc_email_claim: str = "email"
+    oidc_name_claim: str = "name"
+    oidc_role_claim: str = "roles"
+    oidc_role_values_user: str = "user"
+    oidc_role_values_editor: str = "editor"
+    oidc_role_values_admin: str = "admin"
+
+
 # ---------- Roadmaps ----------
 RES_KIND = Literal["article", "video", "docs", "course"]
 

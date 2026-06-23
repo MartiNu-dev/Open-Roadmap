@@ -1,0 +1,88 @@
+{
+  "roles": {
+    "admin": "Admin",
+    "editor": "Editeur"
+  },
+  "roadmapStatus": {
+    "draft": "Brouillon",
+    "published": "Publie",
+    "archived": "Archive"
+  },
+  "roadmaps": {
+    "title": "Gerer les roadmaps",
+    "description": "Creez, publiez, archivez et supprimez des roadmaps. Les changements de tags et de niveau sont enregistres automatiquement.",
+    "newRoadmap": "Nouvelle roadmap",
+    "createRoadmap": "Creer une roadmap",
+    "coverEmoji": "Emoji de couverture",
+    "slug": "Slug (a-z, 0-9, tiret)",
+    "titleField": "Titre",
+    "descriptionField": "Description",
+    "level": "Niveau",
+    "initialStatus": "Statut initial",
+    "tags": "Tags (separes par des virgules)",
+    "tagsPlaceholder": "ex. web, react, css",
+    "metaTagsPlaceholder": "tags, separes par des virgules",
+    "saved": "enregistre",
+    "autoSaves": "enregistrement auto",
+    "deleteConfirm": "Supprimer la roadmap \"{{title}}\" et tous ses blocs/progres ? Cette action est irreversible."
+  },
+  "users": {
+    "eyebrow": "// Admin",
+    "title": "Gestion des utilisateurs",
+    "description": "Promouvez des utilisateurs en editeurs/admins ou supprimez les comptes inactifs.",
+    "name": "Nom",
+    "email": "Email",
+    "role": "Role",
+    "deleteConfirm": "Supprimer l'utilisateur \"{{email}}\" ? Cette action est irreversible."
+  },
+  "tabs": {
+    "users": "Utilisateurs",
+    "authentication": "Authentification"
+  },
+  "auth": {
+    "title": "Parametres d'authentification",
+    "description": "Controlez les modes de connexion disponibles et configurez le SSO entreprise.",
+    "saved": "Les parametres d'authentification ont ete enregistres.",
+    "clearSecret": "Supprimer le secret stocke",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "methods": {
+      "title": "Modes de connexion",
+      "description": "Activez ou desactivez les methodes de connexion proposees aux utilisateurs.",
+      "oidcTitle": "Connexion entreprise OIDC",
+      "oidcDescription": "Affiche un bouton SSO et autorise la connexion via votre fournisseur OpenID Connect.",
+      "selfRegisterTitle": "Inscription libre",
+      "selfRegisterDescription": "Autorise les visiteurs a creer un compte local depuis la page d'inscription."
+    },
+    "oidc": {
+      "title": "Fournisseur OIDC",
+      "description": "Configurez un fournisseur OpenID Connect unique pour vos deploiements entreprise.",
+      "configured": "Configure",
+      "incomplete": "Incomplet"
+    },
+    "callbackOverride": {
+      "badge": "Surcharge env",
+      "description": "Cette URL de callback est actuellement surchargee par une variable d'environnement du backend."
+    },
+    "fields": {
+      "displayName": "Nom affiche",
+      "issuerUrl": "URL issuer",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "clientSecretSaved": "Le secret stocke est conserve tant que vous ne le remplacez pas.",
+      "scopes": "Scopes",
+      "emailClaim": "Claim email",
+      "nameClaim": "Claim nom",
+      "roleClaim": "Claim roles/groupes",
+      "roleValuesUser": "Valeurs role utilisateur",
+      "roleValuesEditor": "Valeurs role editeur",
+      "roleValuesAdmin": "Valeurs role admin",
+      "callbackUrl": "URL de callback"
+    },
+    "secretSource": {
+      "database": "Source du secret : base de donnees",
+      "environment": "Source du secret : variable d'environnement",
+      "none": "Source du secret : aucun secret configure"
+    }
+  }
+}

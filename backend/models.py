@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Text, Integer, DateTime, ForeignKey, UniqueConstraint, Index
+    Column, String, Text, Integer, DateTime, ForeignKey, UniqueConstraint, Index, Boolean
 )
 from sqlalchemy.orm import relationship
 from database import Base
@@ -21,11 +21,50 @@ class User(Base):
     id = Column(String, primary_key=True, default=_uuid)
     email = Column(String, unique=True, nullable=False, index=True)
     name = Column(String, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
     role = Column(String, nullable=False, default="user")  # admin | editor | user
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
 
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
+    external_identities = relationship("ExternalIdentity", back_populates="user", cascade="all, delete-orphan")
+
+
+class AuthSettings(Base):
+    __tablename__ = "auth_settings"
+    id = Column(Integer, primary_key=True, default=1)
+    self_register_enabled = Column(Boolean, nullable=False, default=True)
+    oidc_enabled = Column(Boolean, nullable=False, default=False)
+    oidc_display_name = Column(String, nullable=False, default="Enterprise SSO")
+    oidc_issuer_url = Column(String, nullable=False, default="")
+    oidc_client_id = Column(String, nullable=False, default="")
+    oidc_client_secret = Column(Text, nullable=True)
+    oidc_scopes = Column(String, nullable=False, default="openid profile email")
+    oidc_email_claim = Column(String, nullable=False, default="email")
+    oidc_name_claim = Column(String, nullable=False, default="name")
+    oidc_role_claim = Column(String, nullable=False, default="roles")
+    oidc_role_values_user = Column(Text, nullable=False, default="user")
+    oidc_role_values_editor = Column(Text, nullable=False, default="editor")
+    oidc_role_values_admin = Column(Text, nullable=False, default="admin")
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, nullable=False)
+
+
+class ExternalIdentity(Base):
+    __tablename__ = "external_identities"
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider_type = Column(String, nullable=False, default="oidc")
+    provider_key = Column(String, nullable=False)
+    subject = Column(String, nullable=False)
+    email_at_link = Column(String, nullable=False, default="")
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
+
+    user = relationship("User", back_populates="external_identities")
+
+    __table_args__ = (
+        UniqueConstraint("provider_type", "provider_key", "subject", name="uq_external_identity_provider_subject"),
+        Index("ix_external_identity_lookup", "provider_type", "provider_key", "subject"),
+    )
 
 
 class Roadmap(Base):

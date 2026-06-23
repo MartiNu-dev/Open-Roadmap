@@ -39,7 +39,7 @@ function replaceBlockResources(roadmap, blockId, resources) {
 
 export default function RoadmapDetail() {
   const { slug } = useParams();
-  const { user } = useAuth();
+  const { user, authOptions } = useAuth();
   const { t } = useTranslation(["common", "roadmaps"]);
   const [roadmap, setRoadmap] = useState(null);
   const [progressItems, setProgressItems] = useState([]);
@@ -346,8 +346,16 @@ export default function RoadmapDetail() {
       <div className="max-w-6xl mx-auto px-6 py-8">
         {!user && (
           <div className="mb-6 border border-slate-200 bg-slate-50 rounded-md p-4 text-sm">
-            <Link to="/login" className="underline font-medium">{t("roadmaps:detail.login")}</Link> {t("common:connectors.or")}{" "}
-            <Link to="/register" className="underline font-medium">{t("roadmaps:detail.createAccount")}</Link> {t("roadmaps:detail.trackProgressSuffix")}
+            {authOptions.self_register_enabled ? (
+              <>
+                <Link to="/login" className="underline font-medium">{t("roadmaps:detail.login")}</Link> {t("common:connectors.or")}{" "}
+                <Link to="/register" className="underline font-medium">{t("roadmaps:detail.createAccount")}</Link> {t("roadmaps:detail.trackProgressSuffix")}
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="underline font-medium">{t("roadmaps:detail.login")}</Link> {t("roadmaps:detail.trackProgressSuffix")}
+              </>
+            )}
           </div>
         )}
 

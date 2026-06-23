@@ -1,0 +1,30 @@
+{
+  "login": {
+    "eyebrow": "// Bon retour",
+    "title": "Connexion",
+    "demoAccounts": "Comptes de demonstration :",
+    "email": "Email",
+    "password": "Mot de passe",
+    "signIn": "Se connecter",
+    "signInWithOidc": "Se connecter avec {{provider}}",
+    "signingIn": "Connexion...",
+    "noAccount": "Pas encore de compte ?",
+    "createOne": "En creer un",
+    "selfRegisterDisabled": "La creation de compte est desactivee. Contactez votre administrateur."
+  },
+  "register": {
+    "eyebrow": "// Commencer",
+    "title": "Creer votre compte",
+    "subtitle": "Gratuit pour toujours - suivez votre progression sur chaque roadmap.",
+    "disabledMessage": "L'inscription libre est desactivee pour cet espace.",
+    "name": "Nom",
+    "email": "Email",
+    "password": "Mot de passe",
+    "passwordHint": "6 caracteres minimum.",
+    "createAccount": "Creer un compte",
+    "creating": "Creation...",
+    "alreadyHaveAccount": "Vous avez deja un compte ?",
+    "logIn": "Se connecter",
+    "contactAdmin": "Veuillez contacter votre administrateur ou revenir a "
+  }
+}

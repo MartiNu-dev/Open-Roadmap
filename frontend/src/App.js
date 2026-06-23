@@ -9,7 +9,7 @@ import RoadmapDetail from "@/pages/RoadmapDetail";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
-import AdminUsers from "@/pages/AdminUsers";
+import AdminUsers from "@/pages/AdminUsersEnterprise";
 import AdminRoadmaps from "@/pages/AdminRoadmaps";
 import ProtectedRoute from "@/components/ProtectedRoute";
 

@@ -8,14 +8,36 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from enterprise_auth import (
+    LOCAL_PROVIDER_TYPE,
+    OIDC_STATE_COOKIE,
+    OIDC_PROVIDER_TYPE,
+    apply_auth_settings_update,
+    auth_options_to_dict,
+    auth_settings_to_dict,
+    build_authorization_url,
+    build_logout_redirect_url,
+    create_oidc_state_cookie,
+    decode_oidc_state_cookie,
+    ensure_oidc_enabled,
+    exchange_code_for_tokens,
+    fetch_oidc_discovery,
+    fetch_userinfo,
+    frontend_redirect_url,
+    get_or_create_auth_settings,
+    resolve_oidc_profile,
+    resolve_or_create_oidc_user,
+    validate_id_token,
+)
 from database import Base, engine, get_db
 from migrations import run_migrations
-from models import BlockResource, Roadmap, RoadmapBlock, RoadmapLink, User, UserProgress
+from models import AuthSettings, BlockResource, Roadmap, RoadmapBlock, RoadmapLink, User, UserProgress
 from auth import (
     create_access_token,
     get_current_user,
@@ -25,6 +47,9 @@ from auth import (
 )
 from schemas import (
     BlockOut,
+    AuthOptionsOut,
+    AuthSettingsOut,
+    AuthSettingsUpdateIn,
     BlockPositionIn,
     BlockUpsertIn,
     LinkCreateIn,
@@ -52,6 +77,7 @@ from seed import seed_all
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("roadmap")
+oidc_logger = logging.getLogger("roadmap.oidc")
 
 app = FastAPI(title="Roadmap Platform API")
 api = APIRouter(prefix="/api")
@@ -65,6 +91,7 @@ def on_startup() -> None:
     db = SessionLocal()
     try:
         seed_all(db)
+        get_or_create_auth_settings(db)
         logger.info("Seed complete")
     except Exception:
         logger.exception("Seed failed")
@@ -75,6 +102,7 @@ def on_startup() -> None:
 
 COOKIE_NAME = "access_token"
 CSRF_COOKIE = "csrf_token"
+AUTH_PROVIDER_COOKIE = "auth_provider"
 COOKIE_KW = dict(httponly=True, samesite="lax", secure=False, path="/")
 CSRF_COOKIE_KW = dict(httponly=False, samesite="lax", secure=False, path="/")
 
@@ -89,11 +117,33 @@ def _set_auth_cookies(response: Response, token: str) -> str:
 def _clear_auth_cookies(response: Response) -> None:
     response.delete_cookie(COOKIE_NAME, path="/")
     response.delete_cookie(CSRF_COOKIE, path="/")
+    response.delete_cookie(AUTH_PROVIDER_COOKIE, path="/")
+
+
+def _set_oidc_state_cookie(response: Response, cookie_value: str) -> None:
+    response.set_cookie(OIDC_STATE_COOKIE, cookie_value, max_age=600, **COOKIE_KW)
+
+
+def _clear_oidc_state_cookie(response: Response) -> None:
+    response.delete_cookie(OIDC_STATE_COOKIE, path="/")
+
+
+def _set_auth_provider_cookie(response: Response, provider: str) -> None:
+    response.set_cookie(AUTH_PROVIDER_COOKIE, provider, max_age=60 * 60 * 24 * 7, **COOKIE_KW)
 
 
 # --------------- AUTH ---------------
+@api.get("/auth/options", response_model=AuthOptionsOut)
+def auth_options(db: Session = Depends(get_db)):
+    settings = get_or_create_auth_settings(db)
+    return auth_options_to_dict(settings)
+
+
 @api.post("/auth/register", response_model=TokenOut, status_code=201)
 def register(payload: RegisterIn, response: Response, db: Session = Depends(get_db)):
+    settings = get_or_create_auth_settings(db)
+    if not settings.self_register_enabled:
+        raise HTTPException(status_code=403, detail="Self-registration is disabled")
     email = payload.email.lower().strip()
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -108,6 +158,7 @@ def register(payload: RegisterIn, response: Response, db: Session = Depends(get_
     db.refresh(user)
     token = create_access_token(user.id, user.email, user.role)
     _set_auth_cookies(response, token)
+    _set_auth_provider_cookie(response, LOCAL_PROVIDER_TYPE)
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
@@ -119,18 +170,154 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(user.id, user.email, user.role)
     _set_auth_cookies(response, token)
+    _set_auth_provider_cookie(response, LOCAL_PROVIDER_TYPE)
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
 @api.post("/auth/logout")
 def logout(response: Response, current: User = Depends(get_current_user)):
     _clear_auth_cookies(response)
+    _clear_oidc_state_cookie(response)
     return {"ok": True}
+
+
+@api.get("/auth/logout/browser")
+def logout_browser(
+    request: Request,
+    next_path: str = Query(default="/", alias="next"),
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _ = current
+    redirect_url = frontend_redirect_url(request, next_path)
+    provider = request.cookies.get(AUTH_PROVIDER_COOKIE)
+    response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+    _clear_auth_cookies(response)
+    _clear_oidc_state_cookie(response)
+
+    if provider == OIDC_PROVIDER_TYPE:
+        settings = get_or_create_auth_settings(db)
+        if settings.oidc_enabled:
+            try:
+                discovery = fetch_oidc_discovery(settings)
+                logout_url = build_logout_redirect_url(settings, discovery, request, next_path)
+                if logout_url:
+                    oidc_logger.info(
+                        "OIDC browser logout issuer=%s user_id=%s redirect_url=%s",
+                        settings.oidc_issuer_url,
+                        current.id,
+                        logout_url,
+                    )
+                    response = RedirectResponse(url=logout_url, status_code=status.HTTP_302_FOUND)
+                    _clear_auth_cookies(response)
+                    _clear_oidc_state_cookie(response)
+                    return response
+            except HTTPException:
+                oidc_logger.exception(
+                    "OIDC browser logout fallback to local redirect issuer=%s user_id=%s",
+                    settings.oidc_issuer_url,
+                    current.id,
+                )
+
+    return response
 
 
 @api.get("/auth/me", response_model=UserOut)
 def me(current: User = Depends(get_current_user)):
     return UserOut.model_validate(current)
+
+
+@api.get("/auth/oidc/start")
+def auth_oidc_start(
+    request: Request,
+    next_path: str = Query(default="/dashboard", alias="next"),
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_auth_settings(db)
+    ensure_oidc_enabled(settings)
+    oidc_logger.info(
+        "OIDC start issuer=%s client_id=%s next=%s request_url=%s",
+        settings.oidc_issuer_url,
+        settings.oidc_client_id,
+        next_path,
+        str(request.url),
+    )
+    discovery = fetch_oidc_discovery(settings)
+    safe_next = next_path
+    state, cookie_value = create_oidc_state_cookie(safe_next)
+    state_payload = decode_oidc_state_cookie(cookie_value)
+    authorization_url = build_authorization_url(settings, discovery, request, state, state_payload["nonce"])
+    response = RedirectResponse(url=authorization_url, status_code=status.HTTP_302_FOUND)
+    _set_oidc_state_cookie(response, cookie_value)
+    return response
+
+
+@api.get("/auth/oidc/callback", name="auth_oidc_callback")
+def auth_oidc_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_auth_settings(db)
+    ensure_oidc_enabled(settings)
+    if error:
+        detail = error_description or error
+        oidc_logger.error(
+            "OIDC callback returned provider error issuer=%s error=%s error_description=%s state=%s iss_param=%s",
+            settings.oidc_issuer_url,
+            error,
+            error_description,
+            state,
+            request.query_params.get("iss"),
+        )
+        raise HTTPException(status_code=400, detail=f"OIDC login failed: {detail}")
+    if not code or not state:
+        oidc_logger.error(
+            "OIDC callback missing parameters issuer=%s state=%s has_code=%s query=%s",
+            settings.oidc_issuer_url,
+            state,
+            bool(code),
+            str(request.url.query),
+        )
+        raise HTTPException(status_code=400, detail="OIDC callback is missing required parameters")
+    cookie_token = request.cookies.get(OIDC_STATE_COOKIE)
+    if not cookie_token:
+        oidc_logger.error(
+            "OIDC callback missing session cookie issuer=%s state=%s request_url=%s cookies=%s",
+            settings.oidc_issuer_url,
+            state,
+            str(request.url),
+            sorted(request.cookies.keys()),
+        )
+        raise HTTPException(status_code=400, detail="OIDC login session is missing")
+    state_payload = decode_oidc_state_cookie(cookie_token)
+    if state_payload.get("state") != state:
+        oidc_logger.error(
+            "OIDC callback state mismatch issuer=%s expected_state=%s actual_state=%s request_url=%s",
+            settings.oidc_issuer_url,
+            state_payload.get("state"),
+            state,
+            str(request.url),
+        )
+        raise HTTPException(status_code=400, detail="OIDC state mismatch")
+
+    discovery = fetch_oidc_discovery(settings)
+    tokens = exchange_code_for_tokens(settings, discovery, code, request)
+    id_claims = validate_id_token(settings, discovery, tokens["id_token"], state_payload["nonce"])
+    userinfo = fetch_userinfo(discovery, tokens.get("access_token"))
+    profile = resolve_oidc_profile(settings, id_claims, userinfo)
+    user = resolve_or_create_oidc_user(db, settings, discovery, profile)
+
+    token = create_access_token(user.id, user.email, user.role)
+    redirect_url = frontend_redirect_url(request, state_payload.get("next", "/dashboard"))
+    response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+    _set_auth_cookies(response, token)
+    _set_auth_provider_cookie(response, OIDC_PROVIDER_TYPE)
+    _clear_oidc_state_cookie(response)
+    return response
 
 
 # --------------- ROADMAPS ---------------
@@ -564,6 +751,29 @@ def delete_roadmap(
 
 
 # --------------- ADMIN: USER MANAGEMENT (admin only) ---------------
+@api.get("/admin/auth/settings", response_model=AuthSettingsOut)
+def admin_get_auth_settings(
+    _: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_auth_settings(db)
+    return auth_settings_to_dict(settings)
+
+
+@api.put("/admin/auth/settings", response_model=AuthSettingsOut)
+def admin_update_auth_settings(
+    payload: AuthSettingsUpdateIn,
+    _: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_auth_settings(db)
+    apply_auth_settings_update(settings, payload.model_dump())
+    db.add(settings)
+    db.commit()
+    db.refresh(settings)
+    return auth_settings_to_dict(settings)
+
+
 @api.get("/admin/users", response_model=List[UserOut])
 def admin_list_users(
     _: User = Depends(require_roles("admin")),
