@@ -35,7 +35,7 @@ function renderPage() {
   );
 }
 
-describe("AdminRoadmaps export", () => {
+describe("AdminRoadmaps export/import", () => {
   const clickSpy = jest.fn();
 
   beforeEach(() => {
@@ -129,5 +129,49 @@ describe("AdminRoadmaps export", () => {
         responseType: "blob",
       });
     });
+  });
+
+  it("uploads an import file and reloads roadmaps", async () => {
+    api.post.mockImplementation((url) => {
+      if (url === "/admin/roadmaps/import") {
+        return Promise.resolve({
+          data: {
+            imported_count: 1,
+            roadmaps: [
+              {
+                slug_source: "frontend",
+                slug_final: "frontend-2",
+                title: "Frontend",
+                status: "draft",
+                block_count: 2,
+                link_count: 1,
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({
+        data: new Blob(["{}"], { type: "application/json" }),
+        headers: { "content-disposition": "attachment; filename=\"frontend.json\"" },
+      });
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith("/admin/roadmaps");
+    });
+
+    const file = new File(["{}"], "frontend.json", { type: "application/json" });
+    fireEvent.change(screen.getByTestId("admin-import-file-input"), {
+      target: { files: [file] },
+    });
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith("/admin/roadmaps/import", expect.any(FormData));
+    });
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(global.alert).toHaveBeenCalledWith(expect.stringContaining("1 roadmap(s) imported."));
+    expect(global.alert).toHaveBeenCalledWith(expect.stringContaining("frontend -> frontend-2"));
   });
 });

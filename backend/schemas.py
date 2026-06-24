@@ -254,13 +254,15 @@ class RoadmapExportRequest(BaseModel):
 
 
 class RoadmapExportResource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     label: str
     url: str
-    kind: str
+    kind: RES_KIND
     order_index: int
 
 
 class RoadmapExportBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     ref: str
     title: str
     short_description: str
@@ -281,6 +283,7 @@ class RoadmapExportBlock(BaseModel):
 
 
 class RoadmapExportLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     from_ref: str
     to_ref: str
     style: str
@@ -292,6 +295,7 @@ class RoadmapExportLink(BaseModel):
 
 
 class RoadmapExportRoadmap(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     slug: str
     title: str
     description: str
@@ -304,6 +308,7 @@ class RoadmapExportRoadmap(BaseModel):
 
 
 class RoadmapExportEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     format: str
     version: int
     exported_at: datetime
@@ -311,6 +316,7 @@ class RoadmapExportEnvelope(BaseModel):
 
 
 class RoadmapExportManifestItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     slug: str
     title: str
     status: str
@@ -318,10 +324,25 @@ class RoadmapExportManifestItem(BaseModel):
 
 
 class RoadmapExportManifest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     format: str
     version: int
     exported_at: datetime
     roadmaps: List[RoadmapExportManifestItem]
+
+
+class RoadmapImportItemOut(BaseModel):
+    slug_source: str
+    slug_final: str
+    title: str
+    status: str
+    block_count: int
+    link_count: int
+
+
+class RoadmapImportResult(BaseModel):
+    imported_count: int
+    roadmaps: List[RoadmapImportItemOut]
 
 
 # ---------- Progress ----------

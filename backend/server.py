@@ -7,11 +7,12 @@ import secrets
 import logging
 import io
 import json
+import re
 import zipfile
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
@@ -76,6 +77,8 @@ from schemas import (
     RoadmapExportRequest,
     RoadmapExportResource,
     RoadmapExportRoadmap,
+    RoadmapImportItemOut,
+    RoadmapImportResult,
     RoadmapProgressSummary,
     RoadmapStatusIn,
     RoadmapSummary,
@@ -94,6 +97,8 @@ app = FastAPI(title="Roadmap Platform API")
 api = APIRouter(prefix="/api")
 EXPORT_FORMAT = "open-roadmap-export"
 EXPORT_VERSION = 1
+FORBIDDEN_IMPORT_KEYS = {"id", "roadmap_id", "block_id", "from_block_id", "to_block_id"}
+ROADMAP_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 
 
 @app.on_event("startup")
@@ -375,6 +380,133 @@ def _attachment_headers(filename: str) -> dict:
         "Content-Disposition": f'attachment; filename="{filename}"',
         "Cache-Control": "no-store",
     }
+
+
+def _slugify_for_import(raw: str) -> str:
+    base = (raw or "").strip().lower()
+    if not base:
+        base = "roadmap"
+    base = re.sub(r"[^a-z0-9-]+", "-", base)
+    base = re.sub(r"-{2,}", "-", base).strip("-")
+    return base[:60] or "roadmap"
+
+
+def _next_available_slug(base_slug: str, reserved_slugs: set[str]) -> str:
+    candidate = base_slug
+    if candidate not in reserved_slugs:
+        reserved_slugs.add(candidate)
+        return candidate
+    index = 2
+    while True:
+        suffix = f"-{index}"
+        trimmed = base_slug[: max(1, 60 - len(suffix))].rstrip("-")
+        candidate = f"{trimmed}{suffix}"
+        if candidate not in reserved_slugs:
+            reserved_slugs.add(candidate)
+            return candidate
+        index += 1
+
+
+def _assert_no_forbidden_import_keys(payload, source_name: str) -> None:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key in FORBIDDEN_IMPORT_KEYS:
+                raise HTTPException(status_code=400, detail=f"{source_name}: forbidden key '{key}' in import payload")
+            _assert_no_forbidden_import_keys(value, source_name)
+    elif isinstance(payload, list):
+        for entry in payload:
+            _assert_no_forbidden_import_keys(entry, source_name)
+
+
+def _parse_json_bytes(raw_bytes: bytes, source_name: str) -> dict:
+    try:
+        return json.loads(raw_bytes.decode("utf-8"))
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"{source_name}: file must be valid UTF-8 JSON") from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"{source_name}: invalid JSON ({exc.msg})") from exc
+
+
+def _validate_import_envelope(raw_payload: dict, source_name: str) -> RoadmapExportEnvelope:
+    _assert_no_forbidden_import_keys(raw_payload, source_name)
+    try:
+        envelope = RoadmapExportEnvelope.model_validate(raw_payload)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{source_name}: invalid roadmap export payload") from exc
+    if envelope.format != EXPORT_FORMAT:
+        raise HTTPException(status_code=400, detail=f"{source_name}: unsupported export format '{envelope.format}'")
+    if envelope.version != EXPORT_VERSION:
+        raise HTTPException(status_code=400, detail=f"{source_name}: unsupported export version '{envelope.version}'")
+
+    roadmap = envelope.roadmap
+    if not ROADMAP_SLUG_RE.fullmatch(roadmap.slug):
+        raise HTTPException(status_code=400, detail=f"{source_name}: invalid roadmap slug '{roadmap.slug}'")
+    if not roadmap.title.strip():
+        raise HTTPException(status_code=400, detail=f"{source_name}: roadmap title is required")
+    if not roadmap.blocks:
+        raise HTTPException(status_code=400, detail=f"{source_name}: roadmap must contain at least one block")
+
+    seen_refs = set()
+    for block in roadmap.blocks:
+        if block.ref in seen_refs:
+            raise HTTPException(status_code=400, detail=f"{source_name}: duplicate block ref '{block.ref}'")
+        seen_refs.add(block.ref)
+        if not block.title.strip():
+            raise HTTPException(status_code=400, detail=f"{source_name}: each block must have a title")
+
+    for link in roadmap.links:
+        if link.from_ref not in seen_refs:
+            raise HTTPException(status_code=400, detail=f"{source_name}: link references unknown from_ref '{link.from_ref}'")
+        if link.to_ref not in seen_refs:
+            raise HTTPException(status_code=400, detail=f"{source_name}: link references unknown to_ref '{link.to_ref}'")
+    return envelope
+
+
+def _read_import_bundle(file_name: str, content_type: str, raw_bytes: bytes) -> List[RoadmapExportEnvelope]:
+    lower_name = (file_name or "").lower()
+    normalized_type = (content_type or "").split(";")[0].strip().lower()
+    if lower_name.endswith(".json") or normalized_type == "application/json":
+        payload = _parse_json_bytes(raw_bytes, file_name or "import.json")
+        return [_validate_import_envelope(payload, file_name or "import.json")]
+    if lower_name.endswith(".zip") or normalized_type == "application/zip":
+        try:
+            archive = zipfile.ZipFile(io.BytesIO(raw_bytes))
+        except zipfile.BadZipFile as exc:
+            raise HTTPException(status_code=400, detail="Uploaded ZIP archive is invalid or corrupted") from exc
+
+        names = archive.namelist()
+        if "manifest.json" not in names:
+            raise HTTPException(status_code=400, detail="ZIP import is missing manifest.json")
+        manifest_payload = _parse_json_bytes(archive.read("manifest.json"), "manifest.json")
+        _assert_no_forbidden_import_keys(manifest_payload, "manifest.json")
+        try:
+            manifest = RoadmapExportManifest.model_validate(manifest_payload)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="manifest.json is invalid") from exc
+        if manifest.format != EXPORT_FORMAT:
+            raise HTTPException(status_code=400, detail=f"manifest.json: unsupported export format '{manifest.format}'")
+        if manifest.version != EXPORT_VERSION:
+            raise HTTPException(status_code=400, detail=f"manifest.json: unsupported export version '{manifest.version}'")
+        if not manifest.roadmaps:
+            raise HTTPException(status_code=400, detail="manifest.json must list at least one roadmap file")
+
+        envelopes = []
+        seen_files = set()
+        for item in manifest.roadmaps:
+            if item.file in seen_files:
+                raise HTTPException(status_code=400, detail=f"manifest.json: duplicate file entry '{item.file}'")
+            seen_files.add(item.file)
+            if item.file not in names:
+                raise HTTPException(status_code=400, detail=f"manifest.json: missing roadmap file '{item.file}'")
+            if not item.file.startswith("roadmaps/") or not item.file.endswith(".json"):
+                raise HTTPException(status_code=400, detail=f"manifest.json: invalid roadmap file path '{item.file}'")
+            roadmap_payload = _parse_json_bytes(archive.read(item.file), item.file)
+            envelope = _validate_import_envelope(roadmap_payload, item.file)
+            if envelope.roadmap.slug != item.slug:
+                raise HTTPException(status_code=400, detail=f"{item.file}: slug does not match manifest entry")
+            envelopes.append(envelope)
+        return envelopes
+    raise HTTPException(status_code=400, detail="Import only supports .json and .zip files exported by Open Roadmap")
 
 
 def _serialize_roadmap_export(
@@ -893,6 +1025,104 @@ def export_roadmaps(
         media_type="application/zip",
         headers=_attachment_headers(filename),
     )
+
+
+@api.post("/admin/roadmaps/import", response_model=RoadmapImportResult)
+async def import_roadmaps(
+    file: UploadFile = File(...),
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    filename = file.filename or "import"
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Imported file is empty")
+
+    envelopes = _read_import_bundle(filename, file.content_type or "", raw_bytes)
+    existing_slugs = {slug for (slug,) in db.query(Roadmap.slug).all()}
+    results = []
+
+    try:
+        for envelope in envelopes:
+            roadmap = envelope.roadmap
+            base_slug = _slugify_for_import(roadmap.slug)
+            final_slug = _next_available_slug(base_slug, existing_slugs)
+            imported = Roadmap(
+                slug=final_slug,
+                title=roadmap.title.strip(),
+                description=roadmap.description,
+                cover_emoji=roadmap.cover_emoji,
+                status="draft",
+                tags=_normalize_tags(roadmap.tags),
+                level=roadmap.level or "mixed",
+            )
+            db.add(imported)
+            db.flush()
+
+            block_id_by_ref = {}
+            for block in sorted(roadmap.blocks, key=lambda entry: (entry.order_index, entry.ref)):
+                imported_block = RoadmapBlock(
+                    roadmap_id=imported.id,
+                    title=block.title.strip(),
+                    short_description=block.short_description,
+                    detailed_content=block.detailed_content,
+                    level=block.level,
+                    estimated_duration=block.estimated_duration,
+                    order_index=block.order_index,
+                    x=block.x,
+                    y=block.y,
+                    width=block.width,
+                    height=block.height,
+                    node_style=block.node_style,
+                    kind=block.kind,
+                    bg_color=block.bg_color,
+                    label_position=block.label_position,
+                    label_align=block.label_align,
+                )
+                db.add(imported_block)
+                db.flush()
+                block_id_by_ref[block.ref] = imported_block.id
+
+                for resource in sorted(block.resources, key=lambda entry: entry.order_index):
+                    db.add(BlockResource(
+                        block_id=imported_block.id,
+                        label=resource.label.strip(),
+                        url=resource.url.strip(),
+                        kind=resource.kind,
+                        order_index=resource.order_index,
+                    ))
+
+            for link in roadmap.links:
+                db.add(RoadmapLink(
+                    roadmap_id=imported.id,
+                    from_block_id=block_id_by_ref[link.from_ref],
+                    to_block_id=block_id_by_ref[link.to_ref],
+                    style=link.style,
+                    label=link.label,
+                    color=link.color,
+                    thickness=link.thickness,
+                    from_side=link.from_side,
+                    to_side=link.to_side,
+                ))
+
+            results.append(RoadmapImportItemOut(
+                slug_source=roadmap.slug,
+                slug_final=final_slug,
+                title=roadmap.title,
+                status="draft",
+                block_count=len(roadmap.blocks),
+                link_count=len(roadmap.links),
+            ))
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Roadmap import failed")
+        raise HTTPException(status_code=500, detail="Roadmap import failed")
+
+    return RoadmapImportResult(imported_count=len(results), roadmaps=results)
 
 
 @api.post("/roadmaps", response_model=RoadmapSummary, status_code=201)

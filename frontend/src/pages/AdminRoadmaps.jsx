@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import api, { formatApiError } from "@/lib/api";
 import Navbar from "@/components/Navbar";
@@ -10,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { getLevelLabel, getRoadmapStatusLabel } from "@/i18n/formatters";
-import { Plus, ExternalLink, Trash2, Download } from "lucide-react";
+import { Plus, ExternalLink, Trash2, Download, Upload } from "lucide-react";
 
 const STATUSES = ["draft", "published", "archived"];
 const LEVELS = ["beginner", "intermediate", "advanced", "mixed"];
@@ -99,6 +100,7 @@ function MetaEditor({ roadmap, onSave, t }) {
 export default function AdminRoadmaps() {
   const { user, loading } = useAuth();
   const { t } = useTranslation(["common", "admin", "roadmaps"]);
+  const importInputRef = useRef(null);
   const [roadmaps, setRoadmaps] = useState([]);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ slug: "", title: "", description: "", cover_emoji: "🗺️", status: "draft", tags: "", level: "mixed" });
@@ -106,6 +108,7 @@ export default function AdminRoadmaps() {
   const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
   const [exportingRoadmapId, setExportingRoadmapId] = useState(null);
   const [exportingSelection, setExportingSelection] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const load = async () => {
     try {
@@ -131,6 +134,7 @@ export default function AdminRoadmaps() {
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const allSelected = roadmaps.length > 0 && roadmaps.every((entry) => selectedRoadmapIds.includes(entry.id));
   const isExportBusy = exportingSelection || exportingRoadmapId !== null;
+  const isBusy = isExportBusy || importing;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -204,6 +208,34 @@ export default function AdminRoadmaps() {
     }
   };
 
+  const openImportDialog = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = "";
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    setImporting(true);
+    try {
+      const { data } = await api.post("/admin/roadmaps/import", formData);
+      await load();
+      const renamed = (data.roadmaps || []).filter((entry) => entry.slug_source !== entry.slug_final);
+      const renameLine = renamed.length
+        ? `\n${t("admin:roadmaps.importRenamed")}\n${renamed.map((entry) => `${entry.slug_source} -> ${entry.slug_final}`).join("\n")}`
+        : "";
+      alert(`${t("admin:roadmaps.importSuccess", { count: data.imported_count })}${renameLine}`);
+    } catch (e) {
+      alert(formatApiError(e, t("common:errors.generic")));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -263,6 +295,17 @@ export default function AdminRoadmaps() {
               </form>
             </DialogContent>
           </Dialog>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json,.zip,application/json,application/zip"
+            className="hidden"
+            onChange={handleImportFile}
+            data-testid="admin-import-file-input"
+          />
+          <Button type="button" variant="outline" onClick={openImportDialog} disabled={isBusy} data-testid="admin-import-btn">
+            <Upload size={14} className="mr-1" /> {importing ? t("admin:roadmaps.importing") : t("admin:roadmaps.import")}
+          </Button>
         </div>
 
         {err && <div className="mt-4 text-sm text-red-600">{err}</div>}
@@ -284,7 +327,7 @@ export default function AdminRoadmaps() {
             <Button
               type="button"
               onClick={() => exportRoadmaps(selectedRoadmapIds, exportFallbackFilename(roadmaps, selectedRoadmapIds), true)}
-              disabled={!selectedRoadmapIds.length || isExportBusy}
+              disabled={!selectedRoadmapIds.length || isBusy}
               data-testid="admin-export-selected"
             >
               <Download size={14} className="mr-1" /> {exportingSelection ? t("admin:roadmaps.exporting") : t("admin:roadmaps.exportSelected")}
@@ -324,7 +367,7 @@ export default function AdminRoadmaps() {
                   size="sm"
                   variant="outline"
                   onClick={() => exportRoadmaps([entry.id], `${entry.slug}.json`)}
-                  disabled={isExportBusy}
+                  disabled={isBusy}
                   data-testid={`admin-export-roadmap-${entry.slug}`}
                 >
                   <Download size={14} className="mr-1" /> {exportingRoadmapId === entry.id ? t("admin:roadmaps.exporting") : t("admin:roadmaps.export")}
