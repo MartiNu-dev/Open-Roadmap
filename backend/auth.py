@@ -54,9 +54,7 @@ def _extract_token(request: Request) -> Optional[str]:
     return request.cookies.get("access_token")
 
 
-def get_current_user(
-    request: Request, db: Session = Depends(get_db)
-) -> User:
+def _load_current_user(request: Request, db: Session) -> User:
     token = _extract_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -73,6 +71,21 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+def get_current_user(
+    request: Request, db: Session = Depends(get_db)
+) -> User:
+    return _load_current_user(request, db)
+
+
+def get_optional_current_user(
+    request: Request, db: Session = Depends(get_db)
+) -> Optional[User]:
+    try:
+        return _load_current_user(request, db)
+    except HTTPException:
+        return None
 
 
 def require_roles(*roles: str):

@@ -7,9 +7,16 @@ import { useAuth } from "@/context/AuthContext";
 import BlockSidePanel from "@/components/BlockSidePanel";
 import LinkSidePanel from "@/components/LinkSidePanel";
 import RoadmapCanvas from "@/components/RoadmapCanvas";
+import { getRoadmapStatusLabel } from "@/i18n/formatters";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Pencil, Eye } from "lucide-react";
+
+const STATUS_BADGE = {
+  draft: "bg-slate-100 text-slate-700",
+  published: "bg-emerald-100 text-emerald-700",
+  archived: "bg-amber-100 text-amber-700",
+};
 
 function sortResources(resources = []) {
   return [...resources].sort((a, b) =>
@@ -40,8 +47,10 @@ function replaceBlockResources(roadmap, blockId, resources) {
 export default function RoadmapDetail() {
   const { slug } = useParams();
   const { user, authOptions } = useAuth();
-  const { t } = useTranslation(["common", "roadmaps"]);
+  const { t } = useTranslation(["common", "roadmaps", "admin"]);
   const [roadmap, setRoadmap] = useState(null);
+  const [loadingRoadmap, setLoadingRoadmap] = useState(true);
+  const [roadmapError, setRoadmapError] = useState("");
   const [progressItems, setProgressItems] = useState([]);
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -53,8 +62,18 @@ export default function RoadmapDetail() {
   const isEditor = !!user && (user.role === "admin" || user.role === "editor");
 
   const loadRoadmap = async () => {
-    const { data } = await api.get(`/roadmaps/${slug}`);
-    setRoadmap(data);
+    setLoadingRoadmap(true);
+    setRoadmapError("");
+    setRoadmap(null);
+    setProgressItems([]);
+    try {
+      const { data } = await api.get(`/roadmaps/${slug}`);
+      setRoadmap(data);
+    } catch (err) {
+      setRoadmapError(formatApiError(err, t("roadmaps:detail.errorBody")));
+    } finally {
+      setLoadingRoadmap(false);
+    }
   };
 
   const loadProgress = async (roadmapId) => {
@@ -296,11 +315,28 @@ export default function RoadmapDetail() {
     }
   };
 
-  if (!roadmap) {
+  if (loadingRoadmap) {
     return (
       <div className="min-h-screen bg-white">
         <Navbar />
         <div className="max-w-6xl mx-auto px-6 py-16 text-slate-500" data-testid="roadmap-loading">{t("roadmaps:detail.loading")}</div>
+      </div>
+    );
+  }
+
+  if (!roadmap) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <Link to="/roadmaps" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
+            <ArrowLeft size={14} className="mr-1" /> {t("roadmaps:detail.allRoadmaps")}
+          </Link>
+          <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-6" data-testid="roadmap-error">
+            <h1 className="font-display text-xl font-semibold text-slate-900">{t("roadmaps:detail.errorTitle")}</h1>
+            <p className="mt-2 text-sm text-slate-600">{roadmapError || t("roadmaps:detail.errorBody")}</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -319,9 +355,19 @@ export default function RoadmapDetail() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-6 flex-wrap">
           <div className="text-3xl">{roadmap.cover_emoji}</div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-display text-xl sm:text-2xl font-semibold text-slate-900 truncate" data-testid="roadmap-title">
-              {roadmap.title}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-display text-xl sm:text-2xl font-semibold text-slate-900 truncate" data-testid="roadmap-title">
+                {roadmap.title}
+              </h1>
+              {roadmap.status !== "published" && (
+                <span
+                  className={`text-xs uppercase tracking-wider font-medium px-2 py-0.5 rounded ${STATUS_BADGE[roadmap.status] || STATUS_BADGE.draft}`}
+                  data-testid="roadmap-status-badge"
+                >
+                  {getRoadmapStatusLabel(t, roadmap.status)}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-slate-500 truncate">{roadmap.description}</p>
           </div>
           {user && (

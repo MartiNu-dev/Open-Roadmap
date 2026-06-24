@@ -46,6 +46,8 @@
   },
   "detail": {
     "loading": "Loading roadmap...",
+    "errorTitle": "Roadmap unavailable",
+    "errorBody": "This roadmap does not exist or you do not have access to it.",
     "allRoadmaps": "All roadmaps",
     "progressCount": "{{completed}}/{{total}} completed",
     "viewer": "Viewer",

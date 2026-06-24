@@ -5,31 +5,31 @@
   },
   "roadmapStatus": {
     "draft": "Brouillon",
-    "published": "Publie",
-    "archived": "Archive"
+    "published": "Publié",
+    "archived": "Archivé"
   },
   "roadmaps": {
-    "title": "Gerer les roadmaps",
-    "description": "Creez, publiez, archivez et supprimez des roadmaps. Les changements de tags et de niveau sont enregistres automatiquement.",
+    "title": "Gérer les roadmaps",
+    "description": "Créez, publiez, archivez et supprimez des roadmaps. Les changements de tags et de niveau sont enregistrés automatiquement.",
     "newRoadmap": "Nouvelle roadmap",
-    "createRoadmap": "Creer une roadmap",
-    "coverEmoji": "Emoji de couverture",
-    "slug": "Slug (a-z, 0-9, tiret)",
+    "createRoadmap": "Créer une roadmap",
+    "coverEmoji": "Icone de couverture (windows + ;)",
+    "slug": "Identifiant (a-z, 0-9, tiret)",
     "titleField": "Titre",
     "descriptionField": "Description",
     "level": "Niveau",
     "initialStatus": "Statut initial",
-    "tags": "Tags (separes par des virgules)",
+    "tags": "Étiquettes (separées par des virgules)",
     "tagsPlaceholder": "ex. web, react, css",
-    "metaTagsPlaceholder": "tags, separes par des virgules",
-    "saved": "enregistre",
+    "metaTagsPlaceholder": "tags, separés par des virgules",
+    "saved": "enregistré",
     "autoSaves": "enregistrement auto",
-    "deleteConfirm": "Supprimer la roadmap \"{{title}}\" et tous ses blocs/progres ? Cette action est irreversible."
+    "deleteConfirm": "Supprimer la roadmap \"{{title}}\" et tous ses blocs/progrès ? Cette action est irreversible."
   },
   "users": {
     "eyebrow": "// Admin",
     "title": "Gestion des utilisateurs",
-    "description": "Promouvez des utilisateurs en editeurs/admins ou supprimez les comptes inactifs.",
+    "description": "Promouvez des utilisateurs en éditeurs/admins ou supprimez les comptes inactifs.",
     "name": "Nom",
     "email": "Email",
     "role": "Role",
@@ -40,10 +40,10 @@
     "authentication": "Authentification"
   },
   "auth": {
-    "title": "Parametres d'authentification",
-    "description": "Controlez les modes de connexion disponibles et configurez le SSO entreprise.",
-    "saved": "Les parametres d'authentification ont ete enregistres.",
-    "clearSecret": "Supprimer le secret stocke",
+    "title": "Paramètres d'authentification",
+    "description": "Contrôlez les modes de connexion disponibles et configurez le SSO entreprise.",
+    "saved": "Les paramètres d'authentification ont été enregistrés.",
+    "clearSecret": "Supprimer le secret stocké",
     "save": "Enregistrer",
     "saving": "Enregistrement...",
     "methods": {

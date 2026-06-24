@@ -45,6 +45,7 @@ from models import AuthSettings, BlockResource, Roadmap, RoadmapBlock, RoadmapLi
 from auth import (
     create_access_token,
     get_current_user,
+    get_optional_current_user,
     hash_password,
     require_roles,
     verify_password,
@@ -99,6 +100,7 @@ EXPORT_FORMAT = "open-roadmap-export"
 EXPORT_VERSION = 1
 FORBIDDEN_IMPORT_KEYS = {"id", "roadmap_id", "block_id", "from_block_id", "to_block_id"}
 ROADMAP_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
+EDITOR_ROLES = ("admin", "editor")
 
 
 @app.on_event("startup")
@@ -652,14 +654,20 @@ def list_tags(db: Session = Depends(get_db)):
 
 
 @api.get("/roadmaps/{slug_or_id}", response_model=RoadmapDetail)
-def get_roadmap(slug_or_id: str, db: Session = Depends(get_db)):
+def get_roadmap(
+    slug_or_id: str,
+    current: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
     roadmap = (
         db.query(Roadmap)
         .options(joinedload(Roadmap.blocks).joinedload(RoadmapBlock.resources))
         .filter((Roadmap.slug == slug_or_id) | (Roadmap.id == slug_or_id))
         .first()
     )
-    if roadmap is None or roadmap.status != "published":
+    if roadmap is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    if roadmap.status != "published" and (current is None or current.role not in EDITOR_ROLES):
         raise HTTPException(status_code=404, detail="Roadmap not found")
     blocks = sorted(roadmap.blocks, key=lambda b: b.order_index)
     links = db.query(RoadmapLink).filter(RoadmapLink.roadmap_id == roadmap.id).all()
@@ -674,9 +682,6 @@ def get_roadmap(slug_or_id: str, db: Session = Depends(get_db)):
 
 
 # --------------- CANVAS EDITOR (editor + admin only) ---------------
-EDITOR_ROLES = ("admin", "editor")
-
-
 @api.patch("/blocks/{block_id}/position", response_model=BlockOut)
 def update_block_position(
     block_id: str,
