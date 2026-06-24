@@ -76,13 +76,19 @@ export default function RoadmapDetail() {
     return map;
   }, [progressItems]);
 
-  const total = roadmap?.blocks.length || 0;
-  const completed = progressItems.filter((item) => item.status === "completed").length;
-  const inProgress = progressItems.filter((item) => item.status === "in_progress").length;
+  const progressBlockIds = useMemo(() => new Set(
+    (roadmap?.blocks || [])
+      .filter((block) => block.kind === "block")
+      .map((block) => block.id)
+  ), [roadmap?.blocks]);
+
+  const total = progressBlockIds.size;
+  const completed = progressItems.filter((item) => progressBlockIds.has(item.block_id) && item.status === "completed").length;
+  const inProgress = progressItems.filter((item) => progressBlockIds.has(item.block_id) && item.status === "in_progress").length;
   const percent = total ? Math.round((completed / total) * 100) : 0;
 
   const selectedBlock = roadmap?.blocks.find((block) => block.id === selectedBlockId) || null;
-  const selectedProgress = selectedBlockId ? progressByBlock[selectedBlockId] : null;
+  const selectedProgress = selectedBlockId && selectedBlock?.kind === "block" ? progressByBlock[selectedBlockId] : null;
 
   const openBlock = (block) => {
     setSelectedBlockId(block.id);
@@ -90,7 +96,7 @@ export default function RoadmapDetail() {
   };
 
   const handleStatusChange = async (status) => {
-    if (!user || !selectedBlock || !roadmap) return;
+    if (!user || !selectedBlock || !roadmap || selectedBlock.kind !== "block") return;
     const { data } = await api.post("/progress", {
       roadmap_id: roadmap.id, block_id: selectedBlock.id, status,
     });

@@ -249,6 +249,81 @@ class RoadmapDetail(BaseModel):
     links: List[LinkOut] = []
 
 
+class RoadmapExportRequest(BaseModel):
+    roadmap_ids: List[str]
+
+
+class RoadmapExportResource(BaseModel):
+    label: str
+    url: str
+    kind: str
+    order_index: int
+
+
+class RoadmapExportBlock(BaseModel):
+    ref: str
+    title: str
+    short_description: str
+    detailed_content: str
+    level: str
+    estimated_duration: str
+    order_index: int
+    x: int
+    y: int
+    width: int
+    height: int
+    node_style: str
+    kind: str = "block"
+    bg_color: str = "#0f172a"
+    label_position: str = "bottom"
+    label_align: str = "center"
+    resources: List[RoadmapExportResource] = []
+
+
+class RoadmapExportLink(BaseModel):
+    from_ref: str
+    to_ref: str
+    style: str
+    label: str = ""
+    color: str = "#475569"
+    thickness: str = "medium"
+    from_side: str = "bottom"
+    to_side: str = "top"
+
+
+class RoadmapExportRoadmap(BaseModel):
+    slug: str
+    title: str
+    description: str
+    status: str
+    cover_emoji: str
+    tags: str = ""
+    level: str = "mixed"
+    blocks: List[RoadmapExportBlock]
+    links: List[RoadmapExportLink] = []
+
+
+class RoadmapExportEnvelope(BaseModel):
+    format: str
+    version: int
+    exported_at: datetime
+    roadmap: RoadmapExportRoadmap
+
+
+class RoadmapExportManifestItem(BaseModel):
+    slug: str
+    title: str
+    status: str
+    file: str
+
+
+class RoadmapExportManifest(BaseModel):
+    format: str
+    version: int
+    exported_at: datetime
+    roadmaps: List[RoadmapExportManifestItem]
+
+
 # ---------- Progress ----------
 class ProgressOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

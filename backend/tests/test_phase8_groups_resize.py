@@ -237,6 +237,62 @@ class TestLinkBlocksAndGroups:
                 s.delete(f"{API}/blocks/{bid}", headers=_csrf_headers(s))
 
 
+# --------- Progress only counts real blocks ---------
+class TestProgressIgnoresGroups:
+    def test_groups_do_not_affect_progress_totals(self):
+        editor = _login(EDITOR)
+        user = _login(USER)
+        rid, _ = _frontend_id(editor)
+        created_blocks = []
+        try:
+            before = user.get(f"{API}/progress/me/{rid}")
+            assert before.status_code == 200, before.text
+            before_summary = before.json()
+
+            created_block = editor.post(
+                f"{API}/roadmaps/{rid}/blocks",
+                json={"title": f"TEST_progress_block_{uuid.uuid4().hex[:8]}"},
+                headers=_csrf_headers(editor),
+            )
+            assert created_block.status_code == 201, created_block.text
+            block_id = created_block.json()["id"]
+            created_blocks.append(block_id)
+
+            created_group = editor.post(
+                f"{API}/roadmaps/{rid}/blocks",
+                json={"title": f"TEST_progress_group_{uuid.uuid4().hex[:8]}", "kind": "group"},
+                headers=_csrf_headers(editor),
+            )
+            assert created_group.status_code == 201, created_group.text
+            group_id = created_group.json()["id"]
+            created_blocks.append(group_id)
+
+            block_progress = user.post(
+                f"{API}/progress",
+                json={"roadmap_id": rid, "block_id": block_id, "status": "completed"},
+                headers=_csrf_headers(user),
+            )
+            assert block_progress.status_code == 200, block_progress.text
+
+            group_progress = user.post(
+                f"{API}/progress",
+                json={"roadmap_id": rid, "block_id": group_id, "status": "completed"},
+                headers=_csrf_headers(user),
+            )
+            assert group_progress.status_code == 400, group_progress.text
+
+            after = user.get(f"{API}/progress/me/{rid}")
+            assert after.status_code == 200, after.text
+            after_summary = after.json()
+
+            assert after_summary["total_blocks"] == before_summary["total_blocks"] + 1
+            assert after_summary["completed_blocks"] == before_summary["completed_blocks"] + 1
+            assert all(item["block_id"] != group_id for item in after_summary["items"])
+        finally:
+            for bid in created_blocks:
+                editor.delete(f"{API}/blocks/{bid}", headers=_csrf_headers(editor))
+
+
 # --------- Role enforcement (no new attack surface) ---------
 class TestRoleEnforcement:
     def test_anonymous_create_group_401(self):

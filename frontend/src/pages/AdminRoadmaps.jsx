@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { getLevelLabel, getRoadmapStatusLabel } from "@/i18n/formatters";
-import { Plus, ExternalLink, Trash2 } from "lucide-react";
+import { Plus, ExternalLink, Trash2, Download } from "lucide-react";
 
 const STATUSES = ["draft", "published", "archived"];
 const LEVELS = ["beginner", "intermediate", "advanced", "mixed"];
@@ -19,6 +19,33 @@ const STATUS_BADGE = {
   published: "bg-emerald-100 text-emerald-700",
   archived: "bg-amber-100 text-amber-700",
 };
+
+function parseFilename(contentDisposition, fallback) {
+  if (!contentDisposition) return fallback;
+  const utfMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utfMatch?.[1]) return decodeURIComponent(utfMatch[1]);
+  const basicMatch = contentDisposition.match(/filename="([^"]+)"/i) || contentDisposition.match(/filename=([^;]+)/i);
+  return basicMatch?.[1]?.trim() || fallback;
+}
+
+function triggerDownload(blob, filename) {
+  const href = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(href);
+}
+
+function exportFallbackFilename(roadmaps, roadmapIds) {
+  if (roadmapIds.length === 1) {
+    const selected = roadmaps.find((entry) => entry.id === roadmapIds[0]);
+    return selected ? `${selected.slug}.json` : "roadmap.json";
+  }
+  return "open-roadmap-export.zip";
+}
 
 function MetaEditor({ roadmap, onSave, t }) {
   const [tags, setTags] = useState(roadmap.tags || "");
@@ -76,6 +103,9 @@ export default function AdminRoadmaps() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ slug: "", title: "", description: "", cover_emoji: "🗺️", status: "draft", tags: "", level: "mixed" });
   const [err, setErr] = useState("");
+  const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
+  const [exportingRoadmapId, setExportingRoadmapId] = useState(null);
+  const [exportingSelection, setExportingSelection] = useState(false);
 
   const load = async () => {
     try {
@@ -90,11 +120,17 @@ export default function AdminRoadmaps() {
     if (user && (user.role === "admin" || user.role === "editor")) load();
   }, [user?.id]);
 
+  useEffect(() => {
+    setSelectedRoadmapIds((current) => current.filter((id) => roadmaps.some((entry) => entry.id === id)));
+  }, [roadmaps]);
+
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== "admin" && user.role !== "editor") return <Navigate to="/" replace />;
 
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const allSelected = roadmaps.length > 0 && roadmaps.every((entry) => selectedRoadmapIds.includes(entry.id));
+  const isExportBusy = exportingSelection || exportingRoadmapId !== null;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -133,6 +169,38 @@ export default function AdminRoadmaps() {
       setRoadmaps((prev) => prev.filter((entry) => entry.id !== id));
     } catch (e) {
       alert(formatApiError(e, t("common:errors.generic")));
+    }
+  };
+
+  const toggleSelectedRoadmap = (roadmapId) => {
+    setSelectedRoadmapIds((current) => (
+      current.includes(roadmapId)
+        ? current.filter((id) => id !== roadmapId)
+        : [...current, roadmapId]
+    ));
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedRoadmapIds(allSelected ? [] : roadmaps.map((entry) => entry.id));
+  };
+
+  const exportRoadmaps = async (roadmapIds, fallbackFilename, selectionMode = false) => {
+    if (!roadmapIds.length) return;
+    if (selectionMode) setExportingSelection(true);
+    else setExportingRoadmapId(roadmapIds[0]);
+    try {
+      const response = await api.post("/admin/roadmaps/export", {
+        roadmap_ids: roadmapIds,
+      }, {
+        responseType: "blob",
+      });
+      const filename = parseFilename(response.headers?.["content-disposition"], fallbackFilename);
+      triggerDownload(response.data, filename);
+    } catch (e) {
+      alert(formatApiError(e, t("common:errors.generic")));
+    } finally {
+      if (selectionMode) setExportingSelection(false);
+      else setExportingRoadmapId(null);
     }
   };
 
@@ -199,10 +267,43 @@ export default function AdminRoadmaps() {
 
         {err && <div className="mt-4 text-sm text-red-600">{err}</div>}
 
+        <div className="mt-8 flex items-center justify-between gap-3 flex-wrap">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={toggleSelectAll}
+            disabled={!roadmaps.length}
+            data-testid="admin-select-all-roadmaps"
+          >
+            {allSelected ? t("admin:roadmaps.clearSelection") : t("admin:roadmaps.selectAll")}
+          </Button>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-slate-500" data-testid="admin-selected-count">
+              {t("admin:roadmaps.selectedCount", { count: selectedRoadmapIds.length })}
+            </span>
+            <Button
+              type="button"
+              onClick={() => exportRoadmaps(selectedRoadmapIds, exportFallbackFilename(roadmaps, selectedRoadmapIds), true)}
+              disabled={!selectedRoadmapIds.length || isExportBusy}
+              data-testid="admin-export-selected"
+            >
+              <Download size={14} className="mr-1" /> {exportingSelection ? t("admin:roadmaps.exporting") : t("admin:roadmaps.exportSelected")}
+            </Button>
+          </div>
+        </div>
+
         <div className="mt-10 space-y-3" data-testid="admin-roadmaps-list">
           {roadmaps.map((entry) => (
             <div key={entry.id} data-testid={`admin-roadmap-row-${entry.slug}`} className="border border-slate-200 rounded-lg p-4">
               <div className="flex items-center gap-4 flex-wrap">
+                <input
+                  type="checkbox"
+                  checked={selectedRoadmapIds.includes(entry.id)}
+                  onChange={() => toggleSelectedRoadmap(entry.id)}
+                  className="h-4 w-4 rounded border-slate-300"
+                  aria-label={t("admin:roadmaps.selectOne", { title: entry.title })}
+                  data-testid={`admin-select-roadmap-${entry.slug}`}
+                />
                 <div className="text-2xl">{entry.cover_emoji}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -219,6 +320,15 @@ export default function AdminRoadmaps() {
                 >
                   {STATUSES.map((status) => <option key={status} value={status}>{getRoadmapStatusLabel(t, status)}</option>)}
                 </select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => exportRoadmaps([entry.id], `${entry.slug}.json`)}
+                  disabled={isExportBusy}
+                  data-testid={`admin-export-roadmap-${entry.slug}`}
+                >
+                  <Download size={14} className="mr-1" /> {exportingRoadmapId === entry.id ? t("admin:roadmaps.exporting") : t("admin:roadmaps.export")}
+                </Button>
                 <Link to={`/roadmaps/${entry.slug}`}>
                   <Button size="sm" variant="outline" data-testid={`admin-open-${entry.slug}`}>
                     <ExternalLink size={14} className="mr-1" /> {t("common:actions.open")}

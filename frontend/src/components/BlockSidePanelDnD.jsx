@@ -207,6 +207,7 @@ export default function BlockSidePanelDnD({
 
   if (!block || !form) return null;
 
+  const isTrackableBlock = block.kind === "block";
   const status = progress?.status || "not_started";
   const resources = sortResources(block.resources || []);
   const canReorderResources = canManage && resources.length > 1 && typeof onReorderResources === "function";
@@ -260,11 +261,13 @@ export default function BlockSidePanelDnD({
             <div className="mb-2 flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-slate-500">
               {block.level && <span className="rounded bg-slate-100 px-2 py-0.5">{getLevelLabel(t, block.level)}</span>}
               {block.estimated_duration && <span>~ {block.estimated_duration}</span>}
-              <span className={
-                status === "completed" ? "text-emerald-600"
-                : status === "in_progress" ? "text-blue-600"
-                : "text-slate-500"
-              }>{getProgressStatusLabel(t, status)}</span>
+              {isTrackableBlock && (
+                <span className={
+                  status === "completed" ? "text-emerald-600"
+                  : status === "in_progress" ? "text-blue-600"
+                  : "text-slate-500"
+                }>{getProgressStatusLabel(t, status)}</span>
+              )}
             </div>
             <SheetTitle className="font-display text-2xl text-left text-slate-900">{block.title}</SheetTitle>
             {block.short_description && (
@@ -447,7 +450,7 @@ export default function BlockSidePanelDnD({
           )}
         </div>
 
-        {!canManage && (canEdit ? (
+        {!canManage && isTrackableBlock && (canEdit ? (
           <div className="border-t border-slate-200 p-6 bg-slate-50 sticky bottom-0">
             <h4 className="font-display font-semibold text-sm uppercase tracking-wider text-slate-500 mb-3">{t("blockPanel.updateProgress")}</h4>
             <div className="grid grid-cols-3 gap-2">

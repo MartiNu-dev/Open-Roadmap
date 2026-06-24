@@ -5,6 +5,9 @@ load_dotenv()
 import os
 import secrets
 import logging
+import io
+import json
+import zipfile
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -65,6 +68,14 @@ from schemas import (
     ResourceUpdateIn,
     RoadmapCreateIn,
     RoadmapDetail,
+    RoadmapExportBlock,
+    RoadmapExportEnvelope,
+    RoadmapExportLink,
+    RoadmapExportManifest,
+    RoadmapExportManifestItem,
+    RoadmapExportRequest,
+    RoadmapExportResource,
+    RoadmapExportRoadmap,
     RoadmapProgressSummary,
     RoadmapStatusIn,
     RoadmapSummary,
@@ -81,6 +92,8 @@ oidc_logger = logging.getLogger("roadmap.oidc")
 
 app = FastAPI(title="Roadmap Platform API")
 api = APIRouter(prefix="/api")
+EXPORT_FORMAT = "open-roadmap-export"
+EXPORT_VERSION = 1
 
 
 @app.on_event("startup")
@@ -342,6 +355,126 @@ def _summary_from(r: Roadmap, block_count: int) -> RoadmapSummary:
     )
 
 
+def _dedupe_preserve_order(values: List[str]) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return out
+
+
+def _json_bytes(payload: dict) -> bytes:
+    return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _attachment_headers(filename: str) -> dict:
+    return {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Cache-Control": "no-store",
+    }
+
+
+def _serialize_roadmap_export(
+    roadmap: Roadmap,
+    links: List[RoadmapLink],
+    exported_at: datetime,
+) -> RoadmapExportEnvelope:
+    blocks = sorted(roadmap.blocks, key=lambda b: (b.order_index, b.id))
+    block_refs = {block.id: f"block-{index:03d}" for index, block in enumerate(blocks, start=1)}
+    block_order = {block.id: index for index, block in enumerate(blocks, start=1)}
+
+    export_blocks = []
+    for block in blocks:
+        resources = sorted(block.resources, key=lambda res: (res.order_index, res.id))
+        export_blocks.append(RoadmapExportBlock(
+            ref=block_refs[block.id],
+            title=block.title,
+            short_description=block.short_description,
+            detailed_content=block.detailed_content,
+            level=block.level,
+            estimated_duration=block.estimated_duration,
+            order_index=block.order_index,
+            x=block.x,
+            y=block.y,
+            width=block.width,
+            height=block.height,
+            node_style=block.node_style,
+            kind=block.kind,
+            bg_color=block.bg_color,
+            label_position=block.label_position,
+            label_align=block.label_align,
+            resources=[
+                RoadmapExportResource(
+                    label=res.label,
+                    url=res.url,
+                    kind=res.kind,
+                    order_index=res.order_index,
+                )
+                for res in resources
+            ],
+        ))
+
+    ordered_links = sorted(
+        links,
+        key=lambda link: (
+            block_order.get(link.from_block_id, 10**9),
+            block_order.get(link.to_block_id, 10**9),
+            link.created_at,
+            link.id,
+        ),
+    )
+    export_links = []
+    skipped_links = 0
+    for link in ordered_links:
+        from_ref = block_refs.get(link.from_block_id)
+        to_ref = block_refs.get(link.to_block_id)
+        if from_ref is None or to_ref is None:
+            skipped_links += 1
+            logger.warning(
+                "Skipping orphan roadmap link during export",
+                extra={
+                    "roadmap_id": roadmap.id,
+                    "roadmap_slug": roadmap.slug,
+                    "link_id": link.id,
+                    "from_block_id": link.from_block_id,
+                    "to_block_id": link.to_block_id,
+                },
+            )
+            continue
+        export_links.append(RoadmapExportLink(
+            from_ref=from_ref,
+            to_ref=to_ref,
+            style=link.style,
+            label=link.label,
+            color=link.color,
+            thickness=link.thickness,
+            from_side=link.from_side,
+            to_side=link.to_side,
+        ))
+    if skipped_links:
+        logger.warning("Skipped %s orphan link(s) while exporting roadmap %s", skipped_links, roadmap.slug)
+
+    return RoadmapExportEnvelope(
+        format=EXPORT_FORMAT,
+        version=EXPORT_VERSION,
+        exported_at=exported_at,
+        roadmap=RoadmapExportRoadmap(
+            slug=roadmap.slug,
+            title=roadmap.title,
+            description=roadmap.description,
+            status=roadmap.status,
+            cover_emoji=roadmap.cover_emoji,
+            tags=roadmap.tags or "",
+            level=roadmap.level or "mixed",
+            blocks=export_blocks,
+            links=export_links,
+        ),
+    )
+
+
 @api.get("/roadmaps", response_model=List[RoadmapSummary])
 def list_roadmaps(
     q: Optional[str] = None,
@@ -495,6 +628,9 @@ def delete_block(
     block = db.query(RoadmapBlock).filter(RoadmapBlock.id == block_id).first()
     if block is None:
         raise HTTPException(status_code=404, detail="Block not found")
+    db.query(RoadmapLink).filter(
+        (RoadmapLink.from_block_id == block_id) | (RoadmapLink.to_block_id == block_id)
+    ).delete(synchronize_session=False)
     db.delete(block)
     db.commit()
     return None
@@ -681,6 +817,84 @@ def list_all_roadmaps(
     return [_summary_from(r, count) for r, count in rows]
 
 
+@api.post("/admin/roadmaps/export")
+def export_roadmaps(
+    payload: RoadmapExportRequest,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    roadmap_ids = _dedupe_preserve_order(payload.roadmap_ids)
+    if not roadmap_ids:
+        raise HTTPException(status_code=400, detail="At least one roadmap must be selected")
+
+    roadmaps = (
+        db.query(Roadmap)
+        .options(joinedload(Roadmap.blocks).joinedload(RoadmapBlock.resources))
+        .filter(Roadmap.id.in_(roadmap_ids))
+        .all()
+    )
+    roadmaps_by_id = {roadmap.id: roadmap for roadmap in roadmaps}
+    missing_ids = [roadmap_id for roadmap_id in roadmap_ids if roadmap_id not in roadmaps_by_id]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail=f"Roadmap not found: {missing_ids[0]}")
+
+    links = db.query(RoadmapLink).filter(RoadmapLink.roadmap_id.in_(roadmap_ids)).all()
+    links_by_roadmap = {}
+    for link in links:
+        links_by_roadmap.setdefault(link.roadmap_id, []).append(link)
+
+    exported_at = datetime.now(timezone.utc)
+    exports = [
+        _serialize_roadmap_export(
+            roadmaps_by_id[roadmap_id],
+            links_by_roadmap.get(roadmap_id, []),
+            exported_at,
+        )
+        for roadmap_id in roadmap_ids
+    ]
+
+    if len(exports) == 1:
+        export_payload = exports[0].model_dump(mode="json")
+        filename = f"{exports[0].roadmap.slug}.json"
+        return Response(
+            content=_json_bytes(export_payload),
+            media_type="application/json",
+            headers=_attachment_headers(filename),
+        )
+
+    manifest_items = [
+        RoadmapExportManifestItem(
+            slug=entry.roadmap.slug,
+            title=entry.roadmap.title,
+            status=entry.roadmap.status,
+            file=f"roadmaps/{entry.roadmap.slug}.json",
+        )
+        for entry in exports
+    ]
+    manifest = RoadmapExportManifest(
+        format=EXPORT_FORMAT,
+        version=EXPORT_VERSION,
+        exported_at=exported_at,
+        roadmaps=manifest_items,
+    )
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("manifest.json", _json_bytes(manifest.model_dump(mode="json")))
+        for entry in exports:
+            archive.writestr(
+                f"roadmaps/{entry.roadmap.slug}.json",
+                _json_bytes(entry.model_dump(mode="json")),
+            )
+
+    filename = f"open-roadmap-export-{exported_at.strftime('%Y%m%dT%H%M%SZ')}.zip"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers=_attachment_headers(filename),
+    )
+
+
 @api.post("/roadmaps", response_model=RoadmapSummary, status_code=201)
 def create_roadmap(
     payload: RoadmapCreateIn,
@@ -817,10 +1031,20 @@ def admin_delete_user(
 
 # --------------- PROGRESS ---------------
 def _summarize(db: Session, user_id: str, roadmap_id: str) -> RoadmapProgressSummary:
-    total = db.query(func.count(RoadmapBlock.id)).filter(RoadmapBlock.roadmap_id == roadmap_id).scalar() or 0
+    total = (
+        db.query(func.count(RoadmapBlock.id))
+        .filter(RoadmapBlock.roadmap_id == roadmap_id, RoadmapBlock.kind == "block")
+        .scalar()
+        or 0
+    )
     items = (
         db.query(UserProgress)
-        .filter(UserProgress.user_id == user_id, UserProgress.roadmap_id == roadmap_id)
+        .join(RoadmapBlock, RoadmapBlock.id == UserProgress.block_id)
+        .filter(
+            UserProgress.user_id == user_id,
+            UserProgress.roadmap_id == roadmap_id,
+            RoadmapBlock.kind == "block",
+        )
         .all()
     )
     completed = sum(1 for i in items if i.status == "completed")
@@ -857,6 +1081,8 @@ def upsert_progress(
     block = db.query(RoadmapBlock).filter(RoadmapBlock.id == payload.block_id).first()
     if block is None or block.roadmap_id != payload.roadmap_id:
         raise HTTPException(status_code=404, detail="Block not found in roadmap")
+    if block.kind != "block":
+        raise HTTPException(status_code=400, detail="Progress is only available for blocks")
 
     progress = (
         db.query(UserProgress)
@@ -931,4 +1157,5 @@ app.add_middleware(
     allow_credentials=bool(_origins),
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )

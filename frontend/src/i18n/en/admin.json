@@ -22,6 +22,13 @@
     "tags": "Tags (comma-separated)",
     "tagsPlaceholder": "e.g. web, react, css",
     "metaTagsPlaceholder": "tags, comma-separated",
+    "selectAll": "Select all",
+    "clearSelection": "Clear selection",
+    "selectOne": "Select roadmap {{title}}",
+    "selectedCount": "{{count}} selected",
+    "export": "Export",
+    "exportSelected": "Export selection",
+    "exporting": "Exporting...",
     "saved": "saved",
     "autoSaves": "auto-saves",
     "deleteConfirm": "Delete roadmap \"{{title}}\" and all its blocks/progress? This cannot be undone."
