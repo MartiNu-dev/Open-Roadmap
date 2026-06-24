@@ -19,10 +19,22 @@ USER = {
     "email": os.environ.get("SEED_USER_EMAIL", "user@example.com"),
     "password": os.environ.get("SEED_USER_PASSWORD", "user123"),
 }
+REQUEST_TIMEOUT = 12
+
+
+class TimeoutSession(requests.Session):
+    def request(self, method, url, **kwargs):  # noqa: A003
+        kwargs.setdefault("timeout", REQUEST_TIMEOUT)
+        return super().request(method, url, **kwargs)
+
+
+def _get(url, **kwargs):
+    kwargs.setdefault("timeout", REQUEST_TIMEOUT)
+    return requests.get(url, **kwargs)
 
 
 def _login(creds):
-    s = requests.Session()
+    s = TimeoutSession()
     r = s.post(f"{API}/auth/login", json=creds)
     assert r.status_code == 200, r.text
     return s
@@ -31,7 +43,7 @@ def _login(creds):
 # -------- BASIC LIST: tags+level present in payload --------
 class TestListSummaryFields:
     def test_summary_has_tags_and_level(self):
-        r = requests.get(f"{API}/roadmaps")
+        r = _get(f"{API}/roadmaps")
         assert r.status_code == 200
         data = r.json()
         assert isinstance(data, list) and len(data) >= 3
@@ -43,49 +55,50 @@ class TestListSummaryFields:
             assert "level" in rm and rm["level"] in ("beginner", "intermediate", "advanced", "mixed")
         # Specific seeded values
         assert "react" in slugs["frontend"]["tags"].split(",")
+        assert "public" not in slugs["frontend"]["tags"].split(",")
         assert slugs["devops"]["level"] == "advanced"
 
 
 # -------- FILTERS --------
 class TestFilters:
     def test_q_filter_case_insensitive_title(self):
-        r = requests.get(f"{API}/roadmaps", params={"q": "front"})
+        r = _get(f"{API}/roadmaps", params={"q": "front"})
         assert r.status_code == 200
         slugs = [x["slug"] for x in r.json()]
         assert slugs == ["frontend"], slugs
 
     def test_tag_filter_exact_boundary(self):
-        r = requests.get(f"{API}/roadmaps", params={"tag": "react"})
+        r = _get(f"{API}/roadmaps", params={"tag": "react"})
         assert r.status_code == 200
         slugs = [x["slug"] for x in r.json()]
         assert slugs == ["frontend"], slugs
 
     def test_tag_boundary_safety_no_substring_match(self):
         # 'reac' should NOT match 'react'
-        r = requests.get(f"{API}/roadmaps", params={"tag": "reac"})
+        r = _get(f"{API}/roadmaps", params={"tag": "reac"})
         assert r.status_code == 200
         assert r.json() == [], "tag substring should not match 'react'"
 
     def test_level_filter_advanced(self):
-        r = requests.get(f"{API}/roadmaps", params={"level": "advanced"})
+        r = _get(f"{API}/roadmaps", params={"level": "advanced"})
         assert r.status_code == 200
         slugs = [x["slug"] for x in r.json()]
         assert slugs == ["devops"], slugs
 
     def test_combined_filters(self):
-        r = requests.get(f"{API}/roadmaps", params={"q": "cloud", "tag": "kubernetes", "level": "advanced"})
+        r = _get(f"{API}/roadmaps", params={"q": "cloud", "tag": "kubernetes", "level": "advanced"})
         assert r.status_code == 200
         slugs = [x["slug"] for x in r.json()]
         assert slugs == ["devops"], slugs
 
     def test_level_all_is_no_filter(self):
-        all_r = requests.get(f"{API}/roadmaps").json()
-        sentinel_r = requests.get(f"{API}/roadmaps", params={"level": "all"}).json()
+        all_r = _get(f"{API}/roadmaps").json()
+        sentinel_r = _get(f"{API}/roadmaps", params={"level": "all"}).json()
         assert {x["slug"] for x in all_r} == {x["slug"] for x in sentinel_r}
         assert len(sentinel_r) == len(all_r)
 
     def test_no_match_returns_empty(self):
-        r = requests.get(f"{API}/roadmaps", params={"tag": "nope-xyz"})
+        r = _get(f"{API}/roadmaps", params={"tag": "nope-xyz"})
         assert r.status_code == 200
         assert r.json() == []
 
@@ -93,7 +106,7 @@ class TestFilters:
 # -------- /api/tags --------
 class TestTagsEndpoint:
     def test_tags_sorted_unique(self):
-        r = requests.get(f"{API}/tags")
+        r = _get(f"{API}/tags")
         assert r.status_code == 200
         tags = r.json()
         assert isinstance(tags, list)
@@ -123,7 +136,7 @@ class TestNormalizationCRUD:
         rid = created["id"]
 
         # Re-fetch via list (published) and confirm
-        listed = requests.get(f"{API}/roadmaps").json()
+        listed = s.get(f"{API}/roadmaps").json()
         match = [x for x in listed if x["id"] == rid]
         assert match and match[0]["tags"] == "foo,bar" and match[0]["level"] == "beginner"
 
@@ -135,13 +148,13 @@ class TestNormalizationCRUD:
         assert r2.json()["level"] == "intermediate"
 
         # Reflected in subsequent GET
-        listed2 = requests.get(f"{API}/roadmaps").json()
+        listed2 = s.get(f"{API}/roadmaps").json()
         match2 = [x for x in listed2 if x["id"] == rid]
         assert match2 and match2[0]["tags"] == "new,tag"
         assert match2[0]["level"] == "intermediate"
 
         # Filter by the new tag
-        r3 = requests.get(f"{API}/roadmaps", params={"tag": "new"}).json()
+        r3 = s.get(f"{API}/roadmaps", params={"tag": "new"}).json()
         assert any(x["id"] == rid for x in r3)
 
         # Cleanup as admin
@@ -154,10 +167,11 @@ class TestNormalizationCRUD:
 # -------- REGRESSION: existing endpoints still work --------
 class TestRegression:
     def test_roadmap_detail_includes_tags_level(self):
-        r = requests.get(f"{API}/roadmaps/frontend")
+        r = _get(f"{API}/roadmaps/frontend")
         assert r.status_code == 200
         d = r.json()
         assert "tags" in d and "react" in d["tags"]
+        assert "public" not in d["tags"].split(",")
         assert d["level"] in ("beginner", "intermediate", "advanced", "mixed")
 
     def test_cookie_auth_progress_works(self):

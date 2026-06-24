@@ -35,13 +35,14 @@ from enterprise_auth import (
     fetch_userinfo,
     frontend_redirect_url,
     get_or_create_auth_settings,
+    normalize_claim_values_csv,
     resolve_oidc_profile,
     resolve_or_create_oidc_user,
     validate_id_token,
 )
 from database import Base, engine, get_db
 from migrations import run_migrations
-from models import AuthSettings, BlockResource, Roadmap, RoadmapBlock, RoadmapLink, User, UserProgress
+from models import AuthSettings, BlockResource, OidcRoleTagMapping, Roadmap, RoadmapBlock, RoadmapLink, User, UserProgress
 from auth import (
     create_access_token,
     get_current_user,
@@ -68,6 +69,8 @@ from schemas import (
     ResourceReorderIn,
     ResourceOut,
     ResourceUpdateIn,
+    OidcRoleTagMappingIn,
+    OidcRoleTagMappingOut,
     RoadmapCreateIn,
     RoadmapDetail,
     RoadmapExportBlock,
@@ -84,6 +87,8 @@ from schemas import (
     RoadmapStatusIn,
     RoadmapSummary,
     RoadmapUpdateIn,
+    RoadmapVisibilitySettingsOut,
+    RoadmapVisibilitySettingsUpdateIn,
     RoleUpdateIn,
     TokenOut,
     UserOut,
@@ -101,6 +106,8 @@ EXPORT_VERSION = 1
 FORBIDDEN_IMPORT_KEYS = {"id", "roadmap_id", "block_id", "from_block_id", "to_block_id"}
 ROADMAP_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 EDITOR_ROLES = ("admin", "editor")
+PUBLIC_VISIBILITY_TAG = "public"
+SPECIAL_VISIBILITY_TAGS = {PUBLIC_VISIBILITY_TAG}
 
 
 @app.on_event("startup")
@@ -353,12 +360,103 @@ def _normalize_tags(raw: str) -> str:
     return ",".join(out)
 
 
-def _summary_from(r: Roadmap, block_count: int) -> RoadmapSummary:
+def _normalize_role_key(raw: str) -> str:
+    return str(raw or "").strip().lower()
+
+
+def _tag_list(raw: str, *, include_special: bool = True) -> List[str]:
+    tags = [tag for tag in _normalize_tags(raw).split(",") if tag]
+    if include_special:
+        return tags
+    return [tag for tag in tags if tag not in SPECIAL_VISIBILITY_TAGS]
+
+
+def _tag_set(raw: str, *, include_special: bool = True) -> set[str]:
+    return set(_tag_list(raw, include_special=include_special))
+
+
+def _serialize_public_tags(raw: str) -> str:
+    return ",".join(_tag_list(raw, include_special=False))
+
+
+def _summary_from(r: Roadmap, block_count: int, *, include_special_tags: bool = True) -> RoadmapSummary:
     return RoadmapSummary(
         id=r.id, slug=r.slug, title=r.title, description=r.description,
         status=r.status, cover_emoji=r.cover_emoji,
-        tags=r.tags or "", level=r.level or "mixed",
+        tags=(r.tags or "") if include_special_tags else _serialize_public_tags(r.tags or ""),
+        level=r.level or "mixed",
         block_count=int(block_count),
+    )
+
+
+def _role_tag_mapping_out(mapping: OidcRoleTagMapping) -> OidcRoleTagMappingOut:
+    return OidcRoleTagMappingOut(
+        id=mapping.id,
+        role_name=mapping.role_name,
+        role_key=mapping.role_key,
+        tags=mapping.tags,
+    )
+
+
+def _load_visibility_mappings(db: Session) -> list[OidcRoleTagMapping]:
+    return (
+        db.query(OidcRoleTagMapping)
+        .order_by(func.lower(OidcRoleTagMapping.role_name).asc(), OidcRoleTagMapping.created_at.asc())
+        .all()
+    )
+
+
+def _visible_tags_for_user(user: Optional[User], mappings: list[OidcRoleTagMapping]) -> set[str]:
+    if user is None:
+        return set()
+    role_keys = set(normalize_claim_values_csv(user.oidc_roles or "", lowercase=True).split(",")) if (user.oidc_roles or "") else set()
+    allowed_tags: set[str] = set()
+    for mapping in mappings:
+        if mapping.role_key in role_keys:
+            allowed_tags.update(_tag_set(mapping.tags))
+    return allowed_tags
+
+
+def can_view_published_roadmap(
+    user: Optional[User],
+    settings: AuthSettings,
+    roadmap_tags: str,
+    mappings: list[OidcRoleTagMapping],
+) -> bool:
+    tag_set = _tag_set(roadmap_tags)
+    if PUBLIC_VISIBILITY_TAG in tag_set:
+        return True
+    if user is None:
+        return False
+    if user.role == "admin":
+        return True
+    if user.role == "editor" and settings.editors_see_all_roadmaps:
+        return True
+    allowed_tags = _visible_tags_for_user(user, mappings)
+    return bool(tag_set.intersection(allowed_tags))
+
+
+def _can_access_roadmap_catalog(
+    roadmap: Roadmap,
+    user: Optional[User],
+    settings: AuthSettings,
+    mappings: list[OidcRoleTagMapping],
+) -> bool:
+    if roadmap.status != "published":
+        return bool(user is not None and user.role in EDITOR_ROLES)
+    return can_view_published_roadmap(user, settings, roadmap.tags or "", mappings)
+
+
+def _roadmap_detail_from_model(roadmap: Roadmap, links: list[RoadmapLink], *, include_special_tags: bool = True) -> RoadmapDetail:
+    blocks = sorted(roadmap.blocks, key=lambda b: b.order_index)
+    return RoadmapDetail(
+        id=roadmap.id, slug=roadmap.slug, title=roadmap.title,
+        description=roadmap.description, status=roadmap.status,
+        cover_emoji=roadmap.cover_emoji,
+        tags=(roadmap.tags or "") if include_special_tags else _serialize_public_tags(roadmap.tags or ""),
+        level=roadmap.level or "mixed",
+        blocks=[BlockOut.model_validate(b) for b in blocks],
+        links=[LinkOut.model_validate(l) for l in links],
     )
 
 
@@ -614,6 +712,7 @@ def list_roadmaps(
     q: Optional[str] = None,
     tag: Optional[str] = None,
     level: Optional[str] = None,
+    current: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     query = (
@@ -638,18 +737,30 @@ def list_roadmaps(
     if level and level != "all":
         query = query.filter(Roadmap.level == level)
     rows = query.group_by(Roadmap.id).order_by(Roadmap.created_at.asc()).all()
-    return [_summary_from(r, count) for r, count in rows]
+    settings = get_or_create_auth_settings(db)
+    mappings = _load_visibility_mappings(db)
+    visible_rows = [
+        (roadmap, count)
+        for roadmap, count in rows
+        if can_view_published_roadmap(current, settings, roadmap.tags or "", mappings)
+    ]
+    return [_summary_from(r, count, include_special_tags=False) for r, count in visible_rows]
 
 
 @api.get("/tags", response_model=List[str])
-def list_tags(db: Session = Depends(get_db)):
-    rows = db.query(Roadmap.tags).filter(Roadmap.status == "published", Roadmap.tags != "").all()
+def list_tags(
+    current: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
+    rows = db.query(Roadmap).filter(Roadmap.status == "published", Roadmap.tags != "").all()
+    settings = get_or_create_auth_settings(db)
+    mappings = _load_visibility_mappings(db)
     bag = set()
-    for (raw,) in rows:
-        for t in (raw or "").split(","):
-            t = t.strip().lower()
-            if t:
-                bag.add(t)
+    for roadmap in rows:
+        if not can_view_published_roadmap(current, settings, roadmap.tags or "", mappings):
+            continue
+        for tag_name in _tag_list(roadmap.tags or "", include_special=False):
+            bag.add(tag_name)
     return sorted(bag)
 
 
@@ -667,18 +778,31 @@ def get_roadmap(
     )
     if roadmap is None:
         raise HTTPException(status_code=404, detail="Roadmap not found")
-    if roadmap.status != "published" and (current is None or current.role not in EDITOR_ROLES):
-        raise HTTPException(status_code=404, detail="Roadmap not found")
-    blocks = sorted(roadmap.blocks, key=lambda b: b.order_index)
+    if current is None or current.role not in EDITOR_ROLES:
+        settings = get_or_create_auth_settings(db)
+        mappings = _load_visibility_mappings(db)
+        if not _can_access_roadmap_catalog(roadmap, current, settings, mappings):
+            raise HTTPException(status_code=404, detail="Roadmap not found")
     links = db.query(RoadmapLink).filter(RoadmapLink.roadmap_id == roadmap.id).all()
-    return RoadmapDetail(
-        id=roadmap.id, slug=roadmap.slug, title=roadmap.title,
-        description=roadmap.description, status=roadmap.status,
-        cover_emoji=roadmap.cover_emoji,
-        tags=roadmap.tags or "", level=roadmap.level or "mixed",
-        blocks=[BlockOut.model_validate(b) for b in blocks],
-        links=[LinkOut.model_validate(l) for l in links],
+    return _roadmap_detail_from_model(roadmap, links, include_special_tags=False)
+
+
+@api.get("/admin/roadmaps/detail/{slug_or_id}", response_model=RoadmapDetail)
+def admin_get_roadmap(
+    slug_or_id: str,
+    _: User = Depends(require_roles(*EDITOR_ROLES)),
+    db: Session = Depends(get_db),
+):
+    roadmap = (
+        db.query(Roadmap)
+        .options(joinedload(Roadmap.blocks).joinedload(RoadmapBlock.resources))
+        .filter((Roadmap.slug == slug_or_id) | (Roadmap.id == slug_or_id))
+        .first()
     )
+    if roadmap is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    links = db.query(RoadmapLink).filter(RoadmapLink.roadmap_id == roadmap.id).all()
+    return _roadmap_detail_from_model(roadmap, links, include_special_tags=True)
 
 
 # --------------- CANVAS EDITOR (editor + admin only) ---------------
@@ -1223,6 +1347,58 @@ def admin_update_auth_settings(
     return auth_settings_to_dict(settings)
 
 
+@api.get("/admin/roadmap-visibility-settings", response_model=RoadmapVisibilitySettingsOut)
+def admin_get_roadmap_visibility_settings(
+    _: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_auth_settings(db)
+    mappings = _load_visibility_mappings(db)
+    return RoadmapVisibilitySettingsOut(
+        editors_see_all_roadmaps=bool(settings.editors_see_all_roadmaps),
+        mappings=[_role_tag_mapping_out(mapping) for mapping in mappings],
+    )
+
+
+@api.put("/admin/roadmap-visibility-settings", response_model=RoadmapVisibilitySettingsOut)
+def admin_update_roadmap_visibility_settings(
+    payload: RoadmapVisibilitySettingsUpdateIn,
+    _: User = Depends(require_roles("admin")),
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_auth_settings(db)
+    seen_role_keys = set()
+    normalized_rows = []
+    for entry in payload.mappings:
+        role_name = str(entry.role_name or "").strip()
+        role_key = _normalize_role_key(role_name)
+        tags = _normalize_tags(entry.tags)
+        if not role_key:
+            raise HTTPException(status_code=400, detail="OIDC role name is required")
+        if not tags:
+            raise HTTPException(status_code=400, detail=f"At least one tag is required for role '{role_name}'")
+        if role_key in seen_role_keys:
+            raise HTTPException(status_code=400, detail=f"Duplicate OIDC role mapping for '{role_name}'")
+        seen_role_keys.add(role_key)
+        normalized_rows.append((role_name, role_key, tags))
+
+    settings.editors_see_all_roadmaps = payload.editors_see_all_roadmaps
+    db.query(OidcRoleTagMapping).delete()
+    created_mappings = []
+    for role_name, role_key, tags in normalized_rows:
+        mapping = OidcRoleTagMapping(role_name=role_name, role_key=role_key, tags=tags)
+        db.add(mapping)
+        created_mappings.append(mapping)
+    db.add(settings)
+    db.commit()
+    for mapping in created_mappings:
+        db.refresh(mapping)
+    return RoadmapVisibilitySettingsOut(
+        editors_see_all_roadmaps=bool(settings.editors_see_all_roadmaps),
+        mappings=[_role_tag_mapping_out(mapping) for mapping in created_mappings],
+    )
+
+
 @api.get("/admin/users", response_model=List[UserOut])
 def admin_list_users(
     _: User = Depends(require_roles("admin")),
@@ -1304,6 +1480,10 @@ def my_progress_for_roadmap(
     roadmap = db.query(Roadmap).filter((Roadmap.id == roadmap_id) | (Roadmap.slug == roadmap_id)).first()
     if roadmap is None:
         raise HTTPException(status_code=404, detail="Roadmap not found")
+    settings = get_or_create_auth_settings(db)
+    mappings = _load_visibility_mappings(db)
+    if not _can_access_roadmap_catalog(roadmap, current, settings, mappings):
+        raise HTTPException(status_code=404, detail="Roadmap not found")
     return _summarize(db, current.id, roadmap.id)
 
 
@@ -1318,6 +1498,14 @@ def upsert_progress(
         raise HTTPException(status_code=404, detail="Block not found in roadmap")
     if block.kind != "block":
         raise HTTPException(status_code=400, detail="Progress is only available for blocks")
+    roadmap = db.query(Roadmap).filter(Roadmap.id == payload.roadmap_id).first()
+    if roadmap is None:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+    if current.role not in EDITOR_ROLES:
+        settings = get_or_create_auth_settings(db)
+        mappings = _load_visibility_mappings(db)
+        if not _can_access_roadmap_catalog(roadmap, current, settings, mappings):
+            raise HTTPException(status_code=404, detail="Roadmap not found")
 
     progress = (
         db.query(UserProgress)

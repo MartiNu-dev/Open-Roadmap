@@ -48,6 +48,7 @@ class AuthOptionsOut(BaseModel):
 class AuthSettingsOut(BaseModel):
     self_register_enabled: bool
     oidc_enabled: bool
+    editors_see_all_roadmaps: bool
     oidc_display_name: str
     oidc_issuer_url: str
     oidc_client_id: str
@@ -68,6 +69,7 @@ class AuthSettingsOut(BaseModel):
 class AuthSettingsUpdateIn(BaseModel):
     self_register_enabled: bool = True
     oidc_enabled: bool = False
+    editors_see_all_roadmaps: Optional[bool] = None
     oidc_display_name: str = Field(default="Enterprise SSO", min_length=1, max_length=120)
     oidc_issuer_url: str = ""
     oidc_client_id: str = ""
@@ -194,6 +196,28 @@ class LinkUpdateIn(BaseModel):
 # ---------- Admin ----------
 class RoleUpdateIn(BaseModel):
     role: Role
+
+
+class OidcRoleTagMappingIn(BaseModel):
+    role_name: str = Field(min_length=1, max_length=200)
+    tags: str = Field(min_length=1, max_length=1000)
+
+
+class OidcRoleTagMappingOut(BaseModel):
+    id: str
+    role_name: str
+    role_key: str
+    tags: str
+
+
+class RoadmapVisibilitySettingsOut(BaseModel):
+    editors_see_all_roadmaps: bool
+    mappings: List[OidcRoleTagMappingOut]
+
+
+class RoadmapVisibilitySettingsUpdateIn(BaseModel):
+    editors_see_all_roadmaps: bool = True
+    mappings: List[OidcRoleTagMappingIn] = []
 
 
 RoadmapLevel = Literal["beginner", "intermediate", "advanced", "mixed"]

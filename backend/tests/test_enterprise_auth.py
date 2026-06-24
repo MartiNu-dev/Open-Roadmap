@@ -22,6 +22,13 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parent
 PYTHON = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+REQUEST_TIMEOUT = 12
+
+
+class TimeoutSession(requests.Session):
+    def request(self, method, url, **kwargs):  # noqa: A003
+        kwargs.setdefault("timeout", REQUEST_TIMEOUT)
+        return super().request(method, url, **kwargs)
 
 
 def _free_port() -> int:
@@ -152,7 +159,7 @@ def _wait_for_backend(base_url: str, process: subprocess.Popen, timeout: float =
             output = process.stdout.read() if process.stdout else ""
             raise RuntimeError(f"Backend exited early for {base_url}\n{output}")
         try:
-            response = requests.get(f"{base_url}/")
+            response = requests.get(f"{base_url}/", timeout=1)
             if response.status_code == 200:
                 return
         except requests.RequestException:
@@ -194,15 +201,18 @@ def app_ctx(tmp_path):
         stderr=subprocess.STDOUT,
         text=True,
     )
+    session = None
     try:
         _wait_for_backend(base_url, process)
-        session = requests.Session()
+        session = TimeoutSession()
         yield {
             "session": session,
             "api": f"{base_url}/api",
             "db_path": db_path,
         }
     finally:
+        if session is not None:
+            session.close()
         process.terminate()
         try:
             process.wait(timeout=10)
@@ -220,6 +230,7 @@ def save_oidc_settings(session: requests.Session, api: str, issuer_url: str, csr
     payload = {
         "self_register_enabled": True,
         "oidc_enabled": True,
+        "editors_see_all_roadmaps": True,
         "oidc_display_name": "Contoso SSO",
         "oidc_issuer_url": issuer_url,
         "oidc_client_id": "roadmap-client",
@@ -238,6 +249,17 @@ def save_oidc_settings(session: requests.Session, api: str, issuer_url: str, csr
     return response.json()
 
 
+def save_visibility_settings(session: requests.Session, api: str, csrf: str, **overrides):
+    payload = {
+        "editors_see_all_roadmaps": True,
+        "mappings": [],
+    }
+    payload.update(overrides)
+    response = session.put(f"{api}/admin/roadmap-visibility-settings", json=payload, headers={"X-CSRF-Token": csrf})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def start_oidc_flow(session: requests.Session, api: str) -> tuple[str, dict]:
     response = session.get(f"{api}/auth/oidc/start", params={"next": "/dashboard"}, allow_redirects=False)
     assert response.status_code == 302, response.text
@@ -250,6 +272,24 @@ def fetch_scalar(db_path: Path, query: str, params: tuple = ()):
     with sqlite3.connect(db_path) as conn:
         row = conn.execute(query, params).fetchone()
     return row
+
+
+def create_roadmap(session: requests.Session, api: str, csrf: str, *, slug: str, title: str, tags: str, status: str = "published"):
+    response = session.post(
+        f"{api}/roadmaps",
+        json={
+            "slug": slug,
+            "title": title,
+            "description": title,
+            "cover_emoji": "T",
+            "status": status,
+            "tags": tags,
+            "level": "mixed",
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
 
 
 class TestAuthSettings:
@@ -460,3 +500,188 @@ class TestOidcFlow:
         response = session.get(f"{api}/auth/oidc/callback", params={"code": "auth-code", "state": "wrong-state"}, allow_redirects=False)
         assert response.status_code == 400
         assert response.json()["detail"] == "OIDC state mismatch"
+
+
+class TestRoadmapVisibility:
+    def test_visibility_settings_round_trip(self, app_ctx):
+        session = app_ctx["session"]
+        api = app_ctx["api"]
+
+        csrf = login_admin(session, api)
+        saved = save_visibility_settings(
+            session,
+            api,
+            csrf,
+            editors_see_all_roadmaps=False,
+            mappings=[{"role_name": "ABF", "tags": "dev,nouveau"}],
+        )
+
+        assert saved["editors_see_all_roadmaps"] is False
+        assert saved["mappings"][0]["role_name"] == "ABF"
+        assert saved["mappings"][0]["role_key"] == "abf"
+        assert saved["mappings"][0]["tags"] == "dev,nouveau"
+
+        response = session.get(f"{api}/admin/roadmap-visibility-settings")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["editors_see_all_roadmaps"] is False
+        assert body["mappings"][0]["role_key"] == "abf"
+
+    def test_oidc_user_sees_only_matching_published_roadmaps(self, app_ctx, oidc_provider):
+        session = app_ctx["session"]
+        api = app_ctx["api"]
+
+        csrf = login_admin(session, api)
+        save_oidc_settings(session, api, oidc_provider.issuer, csrf)
+        save_visibility_settings(
+            session,
+            api,
+            csrf,
+            editors_see_all_roadmaps=False,
+            mappings=[{"role_name": "ABF", "tags": "dev,nouveau"}],
+        )
+        create_roadmap(session, api, csrf, slug="oidc-dev", title="OIDC Dev", tags="dev,internal")
+        create_roadmap(session, api, csrf, slug="oidc-ops", title="OIDC Ops", tags="ops")
+        session.post(f"{api}/auth/logout", headers={"X-CSRF-Token": session.cookies.get("csrf_token")})
+
+        anon = requests.get(f"{api}/roadmaps", timeout=REQUEST_TIMEOUT)
+        assert anon.status_code == 200
+        anon_slugs = {entry["slug"] for entry in anon.json()}
+        assert "oidc-dev" not in anon_slugs
+        assert "oidc-ops" not in anon_slugs
+        assert "frontend" in anon_slugs
+
+        state, state_payload = start_oidc_flow(session, api)
+        oidc_provider.set_profile(
+            {
+                "iss": oidc_provider.issuer,
+                "sub": "oidc-visible-user",
+                "aud": "roadmap-client",
+                "exp": 4102444800,
+                "iat": 1700000000,
+                "nonce": state_payload["nonce"],
+                "email": "visible@example.com",
+                "email_verified": True,
+                "groups": ["ABF", "roadmap-user"],
+            }
+        )
+
+        callback = session.get(f"{api}/auth/oidc/callback", params={"code": "auth-code", "state": state}, allow_redirects=False)
+        assert callback.status_code == 302
+
+        catalog = session.get(f"{api}/roadmaps")
+        assert catalog.status_code == 200
+        slugs = {entry["slug"] for entry in catalog.json()}
+        assert "oidc-dev" in slugs
+        assert "oidc-ops" not in slugs
+
+        detail = session.get(f"{api}/roadmaps/oidc-dev")
+        assert detail.status_code == 200
+        assert detail.json()["tags"] == "dev,internal"
+
+        hidden_detail = session.get(f"{api}/roadmaps/oidc-ops")
+        assert hidden_detail.status_code == 404
+
+        tags = session.get(f"{api}/tags")
+        assert tags.status_code == 200
+        tag_values = tags.json()
+        assert "public" not in tag_values
+        assert "dev" in tag_values
+
+        user_row = fetch_scalar(app_ctx["db_path"], "SELECT oidc_roles FROM users WHERE email = ?", ("visible@example.com",))
+        assert user_row[0] == "abf,roadmap-user"
+
+    def test_local_login_keeps_last_known_oidc_roles(self, app_ctx, oidc_provider):
+        session = app_ctx["session"]
+        api = app_ctx["api"]
+
+        register = session.post(
+            f"{api}/auth/register",
+            json={"email": "linked-visible@example.com", "name": "Linked Visible", "password": "secret123"},
+        )
+        assert register.status_code == 201, register.text
+        session.post(f"{api}/auth/logout", headers={"X-CSRF-Token": session.cookies.get("csrf_token")})
+
+        csrf = login_admin(session, api)
+        save_oidc_settings(session, api, oidc_provider.issuer, csrf)
+        save_visibility_settings(
+            session,
+            api,
+            csrf,
+            editors_see_all_roadmaps=False,
+            mappings=[{"role_name": "ABF", "tags": "dev"}],
+        )
+        create_roadmap(session, api, csrf, slug="linked-dev", title="Linked Dev", tags="dev")
+        session.post(f"{api}/auth/logout", headers={"X-CSRF-Token": session.cookies.get("csrf_token")})
+
+        state, state_payload = start_oidc_flow(session, api)
+        oidc_provider.set_profile(
+            {
+                "iss": oidc_provider.issuer,
+                "sub": "oidc-linked-visible",
+                "aud": "roadmap-client",
+                "exp": 4102444800,
+                "iat": 1700000000,
+                "nonce": state_payload["nonce"],
+                "email": "linked-visible@example.com",
+                "email_verified": True,
+                "groups": ["ABF", "roadmap-user"],
+            }
+        )
+        callback = session.get(f"{api}/auth/oidc/callback", params={"code": "auth-code", "state": state}, allow_redirects=False)
+        assert callback.status_code == 302
+        session.post(f"{api}/auth/logout", headers={"X-CSRF-Token": session.cookies.get("csrf_token")})
+
+        local_login = session.post(
+            f"{api}/auth/login",
+            json={"email": "linked-visible@example.com", "password": "secret123"},
+        )
+        assert local_login.status_code == 200, local_login.text
+
+        catalog = session.get(f"{api}/roadmaps")
+        assert catalog.status_code == 200
+        slugs = {entry["slug"] for entry in catalog.json()}
+        assert "linked-dev" in slugs
+
+        user_row = fetch_scalar(app_ctx["db_path"], "SELECT oidc_roles FROM users WHERE email = ?", ("linked-visible@example.com",))
+        assert user_row[0] == "abf,roadmap-user"
+
+    def test_editor_toggle_controls_catalog_but_admin_endpoint_still_allows_management(self, app_ctx):
+        session = app_ctx["session"]
+        api = app_ctx["api"]
+
+        csrf = login_admin(session, api)
+        save_visibility_settings(session, api, csrf, editors_see_all_roadmaps=False, mappings=[])
+        create_roadmap(session, api, csrf, slug="editor-hidden", title="Editor Hidden", tags="secret")
+        session.post(f"{api}/auth/logout", headers={"X-CSRF-Token": session.cookies.get("csrf_token")})
+
+        editor_login = session.post(
+            f"{api}/auth/login",
+            json={"email": "editor@example.com", "password": "editor123"},
+        )
+        assert editor_login.status_code == 200, editor_login.text
+
+        hidden_catalog = session.get(f"{api}/roadmaps")
+        assert hidden_catalog.status_code == 200
+        assert "editor-hidden" not in {entry["slug"] for entry in hidden_catalog.json()}
+
+        hidden_detail = session.get(f"{api}/roadmaps/editor-hidden")
+        assert hidden_detail.status_code == 404
+
+        admin_detail = session.get(f"{api}/admin/roadmaps/detail/editor-hidden")
+        assert admin_detail.status_code == 200
+
+        session.post(f"{api}/auth/logout", headers={"X-CSRF-Token": session.cookies.get("csrf_token")})
+        csrf = login_admin(session, api)
+        save_visibility_settings(session, api, csrf, editors_see_all_roadmaps=True, mappings=[])
+        session.post(f"{api}/auth/logout", headers={"X-CSRF-Token": session.cookies.get("csrf_token")})
+
+        editor_login = session.post(
+            f"{api}/auth/login",
+            json={"email": "editor@example.com", "password": "editor123"},
+        )
+        assert editor_login.status_code == 200, editor_login.text
+
+        visible_catalog = session.get(f"{api}/roadmaps")
+        assert visible_catalog.status_code == 200
+        assert "editor-hidden" in {entry["slug"] for entry in visible_catalog.json()}

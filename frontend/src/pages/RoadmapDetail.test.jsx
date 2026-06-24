@@ -65,7 +65,7 @@ describe("RoadmapDetail", () => {
 
   it("renders a draft roadmap for an editor and shows its status badge", async () => {
     api.get.mockImplementation((url) => {
-      if (url === "/roadmaps/draft-roadmap") {
+      if (url === "/admin/roadmaps/detail/draft-roadmap") {
         return Promise.resolve({
           data: {
             id: "rm-1",

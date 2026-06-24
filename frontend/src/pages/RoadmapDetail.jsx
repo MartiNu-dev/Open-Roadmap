@@ -46,7 +46,7 @@ function replaceBlockResources(roadmap, blockId, resources) {
 
 export default function RoadmapDetail() {
   const { slug } = useParams();
-  const { user, authOptions } = useAuth();
+  const { user, authOptions, loading: authLoading } = useAuth();
   const { t } = useTranslation(["common", "roadmaps", "admin"]);
   const [roadmap, setRoadmap] = useState(null);
   const [loadingRoadmap, setLoadingRoadmap] = useState(true);
@@ -60,6 +60,7 @@ export default function RoadmapDetail() {
   const [linkPanelOpen, setLinkPanelOpen] = useState(false);
 
   const isEditor = !!user && (user.role === "admin" || user.role === "editor");
+  const roadmapEndpoint = isEditor ? `/admin/roadmaps/detail/${slug}` : `/roadmaps/${slug}`;
 
   const loadRoadmap = async () => {
     setLoadingRoadmap(true);
@@ -67,7 +68,7 @@ export default function RoadmapDetail() {
     setRoadmap(null);
     setProgressItems([]);
     try {
-      const { data } = await api.get(`/roadmaps/${slug}`);
+      const { data } = await api.get(roadmapEndpoint);
       setRoadmap(data);
     } catch (err) {
       setRoadmapError(formatApiError(err, t("roadmaps:detail.errorBody")));
@@ -86,7 +87,10 @@ export default function RoadmapDetail() {
     }
   };
 
-  useEffect(() => { loadRoadmap(); }, [slug]);
+  useEffect(() => {
+    if (authLoading) return;
+    loadRoadmap();
+  }, [roadmapEndpoint, authLoading]);
   useEffect(() => { if (roadmap) loadProgress(roadmap.id); }, [roadmap?.id, user?.id]);
 
   const progressByBlock = useMemo(() => {

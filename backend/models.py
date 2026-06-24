@@ -23,6 +23,7 @@ class User(Base):
     name = Column(String, nullable=False)
     password_hash = Column(String, nullable=True)
     role = Column(String, nullable=False, default="user")  # admin | editor | user
+    oidc_roles = Column(Text, nullable=False, default="")
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
 
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
@@ -34,6 +35,7 @@ class AuthSettings(Base):
     id = Column(Integer, primary_key=True, default=1)
     self_register_enabled = Column(Boolean, nullable=False, default=True)
     oidc_enabled = Column(Boolean, nullable=False, default=False)
+    editors_see_all_roadmaps = Column(Boolean, nullable=False, default=True)
     oidc_display_name = Column(String, nullable=False, default="Enterprise SSO")
     oidc_issuer_url = Column(String, nullable=False, default="")
     oidc_client_id = Column(String, nullable=False, default="")
@@ -64,6 +66,21 @@ class ExternalIdentity(Base):
     __table_args__ = (
         UniqueConstraint("provider_type", "provider_key", "subject", name="uq_external_identity_provider_subject"),
         Index("ix_external_identity_lookup", "provider_type", "provider_key", "subject"),
+    )
+
+
+class OidcRoleTagMapping(Base):
+    __tablename__ = "oidc_role_tag_mappings"
+    id = Column(String, primary_key=True, default=_uuid)
+    role_name = Column(String, nullable=False)
+    role_key = Column(String, nullable=False)
+    tags = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("role_key", name="uq_oidc_role_tag_mappings_role_key"),
+        Index("ix_oidc_role_tag_mappings_role_key", "role_key"),
     )
 
 

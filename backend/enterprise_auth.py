@@ -119,6 +119,7 @@ def auth_settings_to_dict(settings: AuthSettings) -> dict[str, Any]:
     return {
         "self_register_enabled": bool(settings.self_register_enabled),
         "oidc_enabled": bool(settings.oidc_enabled),
+        "editors_see_all_roadmaps": bool(settings.editors_see_all_roadmaps),
         "oidc_display_name": settings.oidc_display_name or DEFAULT_OIDC_DISPLAY_NAME,
         "oidc_issuer_url": settings.oidc_issuer_url or "",
         "oidc_client_id": settings.oidc_client_id or "",
@@ -151,6 +152,8 @@ def auth_options_to_dict(settings: AuthSettings) -> dict[str, Any]:
 def apply_auth_settings_update(settings: AuthSettings, payload: dict[str, Any]) -> None:
     settings.self_register_enabled = bool(payload["self_register_enabled"])
     settings.oidc_enabled = bool(payload["oidc_enabled"])
+    if payload.get("editors_see_all_roadmaps") is not None:
+        settings.editors_see_all_roadmaps = bool(payload["editors_see_all_roadmaps"])
     settings.oidc_display_name = (payload["oidc_display_name"] or DEFAULT_OIDC_DISPLAY_NAME).strip()
     settings.oidc_issuer_url = (payload["oidc_issuer_url"] or "").strip().rstrip("/")
     settings.oidc_client_id = (payload["oidc_client_id"] or "").strip()
@@ -431,6 +434,19 @@ def _claim_values(value: Any) -> list[str]:
     return [text] if text else []
 
 
+def normalize_claim_values_csv(value: Any, *, lowercase: bool = False) -> str:
+    seen = set()
+    items = []
+    for item in _claim_values(value):
+        normalized = item.strip()
+        if lowercase:
+            normalized = normalized.lower()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            items.append(normalized)
+    return ",".join(items)
+
+
 def _is_truthy(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -545,6 +561,7 @@ def resolve_or_create_oidc_user(
     if profile["name"]:
         user.name = profile["name"]
     user.role = role
+    user.oidc_roles = normalize_claim_values_csv(profile.get("roles"), lowercase=True)
     logger.info(
         "OIDC login resolved issuer=%s subject=%s email=%s user_id=%s role=%s linked_existing=%s",
         discovery.get("issuer"),

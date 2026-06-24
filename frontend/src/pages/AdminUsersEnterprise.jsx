@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ShieldCheck, Trash2 } from "lucide-react";
+import { CircleHelp, Plus, ShieldCheck, Trash2 } from "lucide-react";
 
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const ROLES = ["user", "editor", "admin"];
 const ROLE_BADGE = {
@@ -22,6 +23,7 @@ const ROLE_BADGE = {
 const DEFAULT_AUTH_SETTINGS = {
   self_register_enabled: true,
   oidc_enabled: false,
+  editors_see_all_roadmaps: true,
   oidc_display_name: "Enterprise SSO",
   oidc_issuer_url: "",
   oidc_client_id: "",
@@ -39,6 +41,18 @@ const DEFAULT_AUTH_SETTINGS = {
   callback_url_override: null,
   callback_url_overridden: false,
 };
+const DEFAULT_VISIBILITY_SETTINGS = {
+  editors_see_all_roadmaps: true,
+  mappings: [],
+};
+
+function createVisibilityMapping() {
+  return {
+    id: `local-${Math.random().toString(36).slice(2, 10)}`,
+    role_name: "",
+    tags: "",
+  };
+}
 
 function AuthToggleRow({ title, description, checked, onCheckedChange, testId }) {
   return (
@@ -62,6 +76,10 @@ export default function AdminUsersEnterprise() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authSettings, setAuthSettings] = useState(DEFAULT_AUTH_SETTINGS);
   const [clearClientSecret, setClearClientSecret] = useState(false);
+  const [visibilityErr, setVisibilityErr] = useState("");
+  const [visibilitySaved, setVisibilitySaved] = useState("");
+  const [visibilityBusy, setVisibilityBusy] = useState(false);
+  const [visibilitySettings, setVisibilitySettings] = useState(DEFAULT_VISIBILITY_SETTINGS);
 
   const callbackUrl = authSettings.callback_url_override || `${API_BASE}/auth/oidc/callback`;
 
@@ -90,10 +108,29 @@ export default function AdminUsersEnterprise() {
     }
   };
 
+  const loadVisibilitySettings = async () => {
+    try {
+      const { data } = await api.get("/admin/roadmap-visibility-settings");
+      setVisibilitySettings({
+        ...DEFAULT_VISIBILITY_SETTINGS,
+        ...data,
+        mappings: (data?.mappings || []).map((entry) => ({
+          id: entry.id,
+          role_name: entry.role_name,
+          tags: entry.tags,
+        })),
+      });
+      setVisibilityErr("");
+    } catch (e) {
+      setVisibilityErr(formatApiError(e, t("common:errors.generic")));
+    }
+  };
+
   useEffect(() => {
     if (user?.role === "admin") {
       loadUsers();
       loadAuthSettings();
+      loadVisibilitySettings();
     }
   }, [user?.id]);
 
@@ -165,6 +202,69 @@ export default function AdminUsersEnterprise() {
       setAuthErr(formatApiError(e, t("common:errors.generic")));
     } finally {
       setAuthBusy(false);
+    }
+  };
+
+  const updateVisibilityField = (field, value) => {
+    setVisibilitySettings((prev) => ({ ...prev, [field]: value }));
+    setVisibilitySaved("");
+  };
+
+  const updateVisibilityMapping = (id, field, value) => {
+    setVisibilitySettings((prev) => ({
+      ...prev,
+      mappings: prev.mappings.map((entry) => (entry.id === id ? { ...entry, [field]: value } : entry)),
+    }));
+    setVisibilitySaved("");
+  };
+
+  const addVisibilityMapping = () => {
+    setVisibilitySettings((prev) => ({
+      ...prev,
+      mappings: [...prev.mappings, createVisibilityMapping()],
+    }));
+    setVisibilitySaved("");
+  };
+
+  const removeVisibilityMapping = (id) => {
+    setVisibilitySettings((prev) => ({
+      ...prev,
+      mappings: prev.mappings.filter((entry) => entry.id !== id),
+    }));
+    setVisibilitySaved("");
+  };
+
+  const saveVisibilitySettings = async (event) => {
+    event.preventDefault();
+    setVisibilityBusy(true);
+    setVisibilityErr("");
+    setVisibilitySaved("");
+
+    try {
+      const mappings = (visibilitySettings.mappings || [])
+        .filter((entry) => entry.role_name.trim() || entry.tags.trim())
+        .map((entry) => ({
+          role_name: entry.role_name,
+          tags: entry.tags,
+        }));
+      const { data } = await api.put("/admin/roadmap-visibility-settings", {
+        editors_see_all_roadmaps: visibilitySettings.editors_see_all_roadmaps,
+        mappings,
+      });
+      setVisibilitySettings({
+        ...DEFAULT_VISIBILITY_SETTINGS,
+        ...data,
+        mappings: (data?.mappings || []).map((entry) => ({
+          id: entry.id,
+          role_name: entry.role_name,
+          tags: entry.tags,
+        })),
+      });
+      setVisibilitySaved(t("admin:visibility.saved"));
+    } catch (e) {
+      setVisibilityErr(formatApiError(e, t("common:errors.generic")));
+    } finally {
+      setVisibilityBusy(false);
     }
   };
 
@@ -361,6 +461,112 @@ export default function AdminUsersEnterprise() {
                 <Button type="submit" disabled={authBusy} data-testid="admin-auth-save-btn">
                   {authBusy ? t("admin:auth.saving") : t("admin:auth.save")}
                 </Button>
+              </div>
+            </form>
+
+            <form onSubmit={saveVisibilitySettings} className="mt-8 space-y-6" data-testid="admin-visibility-settings-form">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-display text-lg font-semibold text-slate-900">{t("admin:visibility.title")}</h3>
+                    <p className="mt-1 text-sm text-slate-600">{t("admin:visibility.description")}</p>
+                  </div>
+                  <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700">
+                    {t("admin:visibility.specialTagBadge")}
+                  </div>
+                </div>
+
+                {(visibilityErr || visibilitySaved) && (
+                  <div className={`text-sm ${visibilityErr ? "text-red-600" : "text-green-700"}`}>
+                    {visibilityErr || visibilitySaved}
+                  </div>
+                )}
+
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="max-w-3xl">
+                    <div className="flex items-center gap-2 font-medium text-slate-900">
+                      <span>{t("admin:visibility.editorsSeeAll.title")}</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-slate-500 hover:text-slate-900" data-testid="admin-visibility-help">
+                              <CircleHelp size={14} />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            {t("admin:visibility.editorsSeeAll.help")}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{t("admin:visibility.editorsSeeAll.description")}</p>
+                  </div>
+                  <Switch
+                    checked={visibilitySettings.editors_see_all_roadmaps}
+                    onCheckedChange={(checked) => updateVisibilityField("editors_see_all_roadmaps", checked)}
+                    data-testid="admin-visibility-editors-see-all"
+                  />
+                </div>
+
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+                  {t("admin:visibility.publicTagHint")}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-medium text-slate-900">{t("admin:visibility.mappingsTitle")}</h4>
+                      <p className="mt-1 text-sm text-slate-600">{t("admin:visibility.mappingsDescription")}</p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={addVisibilityMapping} data-testid="admin-visibility-add">
+                      <Plus size={14} className="mr-1" /> {t("admin:visibility.addMapping")}
+                    </Button>
+                  </div>
+
+                  {visibilitySettings.mappings.length === 0 ? (
+                    <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500" data-testid="admin-visibility-empty">
+                      {t("admin:visibility.empty")}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {visibilitySettings.mappings.map((entry, index) => (
+                        <div key={entry.id} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`visibility-role-${entry.id}`}>{t("admin:visibility.fields.roleName")}</Label>
+                            <Input
+                              id={`visibility-role-${entry.id}`}
+                              value={entry.role_name}
+                              onChange={(e) => updateVisibilityMapping(entry.id, "role_name", e.target.value)}
+                              placeholder={t("admin:visibility.fields.roleNamePlaceholder")}
+                              data-testid={`admin-visibility-role-${index}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`visibility-tags-${entry.id}`}>{t("admin:visibility.fields.tags")}</Label>
+                            <Input
+                              id={`visibility-tags-${entry.id}`}
+                              value={entry.tags}
+                              onChange={(e) => updateVisibilityMapping(entry.id, "tags", e.target.value.toLowerCase())}
+                              placeholder={t("admin:visibility.fields.tagsPlaceholder")}
+                              data-testid={`admin-visibility-tags-${index}`}
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <Button type="button" variant="outline" onClick={() => removeVisibilityMapping(entry.id)} data-testid={`admin-visibility-remove-${index}`}>
+                              <Trash2 size={14} className="text-red-600" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={visibilityBusy} data-testid="admin-visibility-save-btn">
+                    {visibilityBusy ? t("admin:visibility.saving") : t("admin:visibility.save")}
+                  </Button>
+                </div>
               </div>
             </form>
           </TabsContent>

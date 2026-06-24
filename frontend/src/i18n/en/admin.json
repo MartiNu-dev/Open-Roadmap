@@ -95,5 +95,29 @@
       "environment": "Secret source: environment override",
       "none": "Secret source: none configured"
     }
+  },
+  "visibility": {
+    "title": "Roadmap visibility",
+    "description": "Associate OIDC roles with roadmap tags to control which published roadmaps are visible.",
+    "specialTagBadge": "Special tag: public",
+    "saved": "Roadmap visibility settings saved.",
+    "save": "Save visibility",
+    "saving": "Saving...",
+    "publicTagHint": "A published roadmap tagged with `public` stays visible to everyone, regardless of role mappings.",
+    "mappingsTitle": "OIDC role to tag mappings",
+    "mappingsDescription": "Users can see a published roadmap when one of their stored OIDC roles matches a mapping and the roadmap contains at least one mapped tag.",
+    "addMapping": "Add mapping",
+    "empty": "No visibility mapping yet. Add a role and the roadmap tags it should unlock.",
+    "editorsSeeAll": {
+      "title": "Editors can see all roadmaps",
+      "description": "When enabled, editors bypass tag visibility rules for published roadmaps.",
+      "help": "If disabled, editors only see published roadmaps made public or allowed by one of their mapped OIDC roles."
+    },
+    "fields": {
+      "roleName": "OIDC role",
+      "roleNamePlaceholder": "e.g. ABF",
+      "tags": "Allowed tags",
+      "tagsPlaceholder": "e.g. dev,nouveau"
+    }
   }
 }

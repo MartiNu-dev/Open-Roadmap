@@ -13,7 +13,7 @@ ROADMAPS = [
         "title": "Frontend Developer",
         "description": "A step-by-step guide to becoming a modern frontend developer in 2026.",
         "cover_emoji": "🎨",
-        "tags": "web,react,css,javascript",
+        "tags": "public,web,react,css,javascript",
         "level": "mixed",
         "blocks": [
             ("Internet Fundamentals", "How the web works", "Learn how HTTP, DNS, browsers and hosting work together to deliver web pages.", "beginner", "3h"),
@@ -34,7 +34,7 @@ ROADMAPS = [
         "title": "Backend Developer",
         "description": "Master server-side development, APIs, databases and distributed systems.",
         "cover_emoji": "⚙️",
-        "tags": "api,databases,python,distributed-systems",
+        "tags": "public,api,databases,python,distributed-systems",
         "level": "mixed",
         "blocks": [
             ("Choose a Language", "Python, Node, Go...", "Compare ecosystems and pick a primary backend language.", "beginner", "2h"),
@@ -55,7 +55,7 @@ ROADMAPS = [
         "title": "DevOps & Cloud",
         "description": "Bridge development and operations with automation, infrastructure-as-code and reliable delivery.",
         "cover_emoji": "🚀",
-        "tags": "cloud,devops,kubernetes,terraform",
+        "tags": "public,cloud,devops,kubernetes,terraform",
         "level": "advanced",
         "blocks": [
             ("Linux Fundamentals", "Your daily driver", "File system, processes, systemd, networking and shell scripting.", "beginner", "8h"),

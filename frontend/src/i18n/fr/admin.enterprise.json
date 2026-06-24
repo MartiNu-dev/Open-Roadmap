@@ -84,5 +84,29 @@
       "environment": "Source du secret : variable d'environnement",
       "none": "Source du secret : aucun secret configure"
     }
+  },
+  "visibility": {
+    "title": "Visibilite des roadmaps",
+    "description": "Associez des roles OIDC a des tags de roadmap pour controler quelles roadmaps publiees sont visibles.",
+    "specialTagBadge": "Tag special : public",
+    "saved": "Les parametres de visibilite ont ete enregistres.",
+    "save": "Enregistrer la visibilite",
+    "saving": "Enregistrement...",
+    "publicTagHint": "Une roadmap publiee taguee `public` reste visible par tous, quel que soit le mapping des roles.",
+    "mappingsTitle": "Mappings role OIDC -> tags",
+    "mappingsDescription": "Un utilisateur peut voir une roadmap publiee si un de ses roles OIDC memorises correspond a un mapping et que la roadmap contient au moins un tag autorise.",
+    "addMapping": "Ajouter un mapping",
+    "empty": "Aucun mapping de visibilite pour le moment. Ajoutez un role et les tags de roadmap qu'il doit ouvrir.",
+    "editorsSeeAll": {
+      "title": "Les editeurs voient toutes les roadmaps",
+      "description": "Quand cette option est activee, les editeurs contournent les regles de visibilite par tags sur les roadmaps publiees.",
+      "help": "Si cette option est decochee, les editeurs ne voient que les roadmaps publiees rendues publiques ou autorisees par un de leurs roles OIDC mappes."
+    },
+    "fields": {
+      "roleName": "Role OIDC",
+      "roleNamePlaceholder": "ex. ABF",
+      "tags": "Tags autorises",
+      "tagsPlaceholder": "ex. dev,nouveau"
+    }
   }
 }

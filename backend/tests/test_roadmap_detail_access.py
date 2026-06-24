@@ -89,7 +89,7 @@ def _csrf_headers(session):
     return {"X-CSRF-Token": session.cookies.get("csrf_token")}
 
 
-def _create_roadmap(session, api_base, slug, status):
+def _create_roadmap(session, api_base, slug, status, tags="detail,test"):
     response = session.post(
         f"{api_base}/roadmaps",
         json={
@@ -98,7 +98,7 @@ def _create_roadmap(session, api_base, slug, status):
             "description": "detail access test",
             "cover_emoji": "T",
             "status": status,
-            "tags": "detail,test",
+            "tags": tags,
             "level": "mixed",
         },
         headers=_csrf_headers(session),
@@ -183,7 +183,7 @@ class TestRoadmapDetailAccess:
         admin = requests.Session()
         _login(editor, api_base, EDITOR)
         _login(admin, api_base, ADMIN)
-        roadmap = _create_roadmap(editor, api_base, f"detail-public-{uuid.uuid4().hex[:8]}", "published")
+        roadmap = _create_roadmap(editor, api_base, f"detail-public-{uuid.uuid4().hex[:8]}", "published", tags="public,detail,test")
 
         try:
             response = requests.get(f"{api_base}/roadmaps/{roadmap['slug']}", timeout=12)
