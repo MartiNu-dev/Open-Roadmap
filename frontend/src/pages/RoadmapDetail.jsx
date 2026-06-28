@@ -114,7 +114,7 @@ export default function RoadmapDetail() {
   const selectedProgress = selectedBlockId && (selectedBlock?.kind === "block" || selectedBlock?.kind === "checkbox") ? progressByBlock[selectedBlockId] : null;
 
   const openBlock = (block) => {
-    if (block.kind === "checkbox" && !(isEditor && editMode)) return;
+    if ((block.kind === "checkbox" || block.kind === "text") && !(isEditor && editMode)) return;
     setSelectedBlockId(block.id);
     setPanelOpen(true);
   };
@@ -223,6 +223,31 @@ export default function RoadmapDetail() {
         y: Math.max(0, Math.round(y)),
         width: 320,
         height: 44,
+      });
+      setRoadmap((current) => ({ ...current, blocks: [...current.blocks, data] }));
+    } catch (e) {
+      alert(formatApiError(e, t("common:errors.generic")));
+    }
+  };
+
+  const handleAddTextAt = async (x, y) => {
+    try {
+      const { data } = await api.post(`/roadmaps/${roadmap.id}/blocks`, {
+        title: "Texte libre",
+        short_description: "",
+        detailed_content: "",
+        level: "",
+        estimated_duration: "",
+        node_style: "label",
+        kind: "text",
+        label_align: "left",
+        text_color: "#0f172a",
+        font_size: "base",
+        font_size_px: null,
+        x: Math.max(0, Math.round(x)),
+        y: Math.max(0, Math.round(y)),
+        width: 320,
+        height: 80,
       });
       setRoadmap((current) => ({ ...current, blocks: [...current.blocks, data] }));
     } catch (e) {
@@ -473,6 +498,7 @@ export default function RoadmapDetail() {
           onAddBlockAt={handleAddBlockAt}
           onAddGroupAt={handleAddGroupAt}
           onAddCheckboxAt={handleAddCheckboxAt}
+          onAddTextAt={handleAddTextAt}
           onResizeBlock={handleResizeBlock}
           onToggleCheckbox={handleToggleCheckbox}
         />

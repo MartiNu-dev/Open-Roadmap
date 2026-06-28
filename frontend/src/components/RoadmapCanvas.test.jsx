@@ -85,6 +85,45 @@ function buildCheckboxRoadmap(overrides = {}) {
   };
 }
 
+function buildTextRoadmap(overrides = {}) {
+  return {
+    id: "rm-1",
+    blocks: [
+      {
+        id: "text-1",
+        roadmap_id: "rm-1",
+        title: "First line\nSecond line with a little more content",
+        short_description: "",
+        detailed_content: "",
+        level: "",
+        estimated_duration: "",
+        order_index: 1,
+        x: 160,
+        y: 120,
+        width: 260,
+        height: 80,
+        node_style: "label",
+        kind: "text",
+        visibility_mode: "visible",
+        bg_color: "#0f172a",
+        border_color: "#94a3b8",
+        border_style: "solid",
+        border_thickness: "small",
+        label_position: "bottom",
+        label_align: "justify",
+        checkbox_color: "#111827",
+        text_color: "#1d4ed8",
+        font_size: "custom",
+        font_size_px: 22,
+        label_side: "right",
+        resources: [],
+        ...overrides,
+      },
+    ],
+    links: [],
+  };
+}
+
 describe("RoadmapCanvas transparent groups", () => {
   it("stays invisible and non-clickable in viewer mode", () => {
     const onSelectBlock = jest.fn();
@@ -219,5 +258,62 @@ describe("RoadmapCanvas checkbox blocks", () => {
     fireEvent.contextMenu(screen.getByTestId("roadmap-canvas"));
 
     expect(screen.getByTestId("ctx-add-checkbox")).toBeInTheDocument();
+  });
+});
+
+describe("RoadmapCanvas text blocks", () => {
+  it("renders free text without opening anything in viewer mode", () => {
+    const onSelectBlock = jest.fn();
+
+    renderCanvas({
+      roadmap: buildTextRoadmap(),
+      progressByBlock: {},
+      isEditor: false,
+      editMode: false,
+      onSelectBlock,
+    });
+
+    fireEvent.click(screen.getByTestId("canvas-text-text-1"));
+
+    expect(onSelectBlock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("text-content-text-1")).toHaveStyle({
+      color: "rgb(29, 78, 216)",
+      textAlign: "justify",
+      fontSize: "22px",
+    });
+  });
+
+  it("opens text configuration in editor mode and exposes resize handles", () => {
+    const onSelectBlock = jest.fn();
+
+    renderCanvas({
+      roadmap: buildTextRoadmap(),
+      progressByBlock: {},
+      isEditor: true,
+      editMode: true,
+      onSelectBlock,
+    });
+
+    fireEvent.click(screen.getByTestId("canvas-text-text-1"));
+
+    expect(onSelectBlock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("resize-se-text-1")).toBeInTheDocument();
+  });
+
+  it("shows add-text actions in editor toolbar and context menu", () => {
+    renderCanvas({
+      roadmap: buildTextRoadmap(),
+      progressByBlock: {},
+      isEditor: true,
+      editMode: true,
+      onSelectBlock: jest.fn(),
+      onAddTextAt: jest.fn(),
+    });
+
+    expect(screen.getByTestId("editor-add-text-btn")).toBeInTheDocument();
+
+    fireEvent.contextMenu(screen.getByTestId("roadmap-canvas"));
+
+    expect(screen.getByTestId("ctx-add-text")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Ghost, Loader2, Plus, Square } from "lucide-react";
+import { Check, Ghost, Loader2, Plus, Square, Type } from "lucide-react";
 import { getLevelLabel } from "@/i18n/formatters";
 
 const NODE_STYLES = {
@@ -15,6 +15,7 @@ const FONT_SIZE_CLASS = {
   base: "text-base",
   lg: "text-lg",
   xl: "text-xl",
+  custom: "",
 };
 const STATUS_RING = {
   not_started: "", in_progress: "ring-2 ring-blue-500 ring-offset-2",
@@ -214,36 +215,148 @@ function CheckboxNode({ block, status, isEditor, editMode, onMouseDownCheckbox, 
   );
 }
 
+function TextNode({ block, isEditor, editMode, onMouseDownText, onResizeMouseDown, onClick, suppressClickRef, onMeasureRef }) {
+  const isEditInteractive = isEditor && editMode;
+  const fontSizeClass = block.font_size === "custom" ? "" : (FONT_SIZE_CLASS[block.font_size] || FONT_SIZE_CLASS.base);
+
+  return (
+    <div
+      data-block-id={block.id}
+      data-block-kind="text"
+      data-testid={`canvas-text-${block.id}`}
+      className={`absolute select-none group ${isEditInteractive ? "cursor-move" : "pointer-events-none"}`}
+      style={{ left: block.x, top: block.y, width: block.width, height: block.height, zIndex: 1 }}
+      onMouseDown={(e) => onMouseDownText(e, block)}
+      onClick={() => {
+        if (!isEditInteractive || suppressClickRef.current) return;
+        onClick?.(block);
+      }}
+      onContextMenu={(e) => {
+        if (!isEditInteractive) return;
+        e.preventDefault();
+        if (!suppressClickRef.current) onClick?.(block);
+      }}
+    >
+      <div className={`relative h-full w-full ${isEditInteractive ? "rounded-md border border-dashed border-slate-300 bg-white/80" : ""}`}>
+        <div
+          ref={(node) => onMeasureRef(block.id, node)}
+          className={`min-w-0 whitespace-pre-wrap break-words leading-snug px-2 py-2 ${fontSizeClass}`}
+          style={{
+            color: block.text_color,
+            textAlign: block.label_align || "left",
+            fontSize: block.font_size === "custom" && block.font_size_px ? `${block.font_size_px}px` : undefined,
+          }}
+          data-testid={`text-content-${block.id}`}
+        >
+          {block.title}
+        </div>
+        {isEditInteractive && ["nw", "ne", "sw", "se"].map((corner) => {
+          const pos = {
+            nw: { left: -6, top: -6 },
+            ne: { right: -6, top: -6 },
+            sw: { left: -6, bottom: -6 },
+            se: { right: -6, bottom: -6 },
+          }[corner];
+          return (
+            <div
+              key={corner}
+              data-no-drag
+              data-resize-corner={corner}
+              data-testid={`resize-${corner}-${block.id}`}
+              className="absolute w-3 h-3 rounded-sm bg-white border-2 border-slate-900 opacity-0 group-hover:opacity-100 hover:scale-125 transition shadow"
+              style={{ ...pos, cursor: RESIZE_CURSOR[corner] }}
+              onMouseDown={(e) => onResizeMouseDown(e, block, corner)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function RoadmapCanvas({
   roadmap, progressByBlock, isEditor, editMode,
   onSelectBlock, onMoveBlock, onCreateLink, onDeleteLink, onSelectLink,
-  onAddBlockAt, onAddGroupAt, onAddCheckboxAt, onResizeBlock, onToggleCheckbox,
+  onAddBlockAt, onAddGroupAt, onAddCheckboxAt, onAddTextAt, onResizeBlock, onToggleCheckbox,
 }) {
   const { t } = useTranslation("roadmaps");
   const [positions, setPositions] = useState({});
   const [pendingLink, setPendingLink] = useState(null);
   const [menu, setMenu] = useState(null);
+  const [textMinHeights, setTextMinHeights] = useState({});
   const draggingRef = useRef(null);
   const suppressClickRef = useRef(false);
   const wrapRef = useRef(null);
+  const textMeasureRefs = useRef({});
+  const autoSizedRef = useRef({});
 
   useEffect(() => {
     if (!roadmap) return;
     const next = {};
     for (const block of roadmap.blocks) next[block.id] = { x: block.x, y: block.y, width: block.width, height: block.height };
     setPositions(next);
+    setTextMinHeights({});
+    textMeasureRefs.current = {};
+    autoSizedRef.current = {};
   }, [roadmap?.id, roadmap?.blocks?.length]);
+
+  const textBlocks = useMemo(() => (
+    (roadmap?.blocks || []).filter((block) => block.kind === "text")
+  ), [roadmap?.blocks]);
 
   const bounds = useMemo(() => {
     let mx = 800;
     let my = 600;
     for (const block of roadmap?.blocks || []) {
       const point = positions[block.id] || block;
+      const height = block.kind === "text" ? Math.max(point.height, textMinHeights[block.id] || 0) : point.height;
       mx = Math.max(mx, point.x + point.width + 100);
-      my = Math.max(my, point.y + point.height + 120);
+      my = Math.max(my, point.y + height + 120);
     }
     return { width: mx, height: my };
-  }, [roadmap, positions]);
+  }, [roadmap, positions, textMinHeights]);
+
+  useEffect(() => {
+    if (!textBlocks.length) return;
+    const nextHeights = {};
+    for (const block of textBlocks) {
+      const node = textMeasureRefs.current[block.id];
+      if (!node) continue;
+      nextHeights[block.id] = Math.max(36, Math.ceil(node.scrollHeight));
+    }
+    if (!Object.keys(nextHeights).length) return;
+    setTextMinHeights((prev) => {
+      let changed = false;
+      const merged = { ...prev };
+      for (const [blockId, height] of Object.entries(nextHeights)) {
+        if (merged[blockId] !== height) {
+          merged[blockId] = height;
+          changed = true;
+        }
+      }
+      return changed ? merged : prev;
+    });
+  }, [positions, textBlocks]);
+
+  useEffect(() => {
+    if (!isEditor || !editMode || !onResizeBlock) return;
+    for (const block of textBlocks) {
+      const point = positions[block.id] || block;
+      const minHeight = textMinHeights[block.id] || 0;
+      if (minHeight <= point.height) {
+        delete autoSizedRef.current[block.id];
+        continue;
+      }
+      const signature = `${point.x}:${point.y}:${point.width}:${minHeight}`;
+      if (autoSizedRef.current[block.id] === signature) continue;
+      autoSizedRef.current[block.id] = signature;
+      setPositions((prev) => ({
+        ...prev,
+        [block.id]: { ...(prev[block.id] || point), height: minHeight },
+      }));
+      void onResizeBlock(block.id, point.x, point.y, point.width, minHeight);
+    }
+  }, [editMode, isEditor, onResizeBlock, positions, textBlocks, textMinHeights]);
 
   const canvasPoint = (e) => {
     const rect = wrapRef.current?.getBoundingClientRect();
@@ -347,7 +460,7 @@ export default function RoadmapCanvas({
         const targetKind = card?.getAttribute("data-block-kind");
         const anchorEl = element?.closest("[data-anchor-side]");
         const targetSide = anchorEl?.getAttribute("data-anchor-side") || "top";
-        if (targetId && targetId !== drag.fromId && targetKind !== "checkbox" && onCreateLink) {
+        if (targetId && targetId !== drag.fromId && (targetKind === "block" || targetKind === "group") && onCreateLink) {
           await onCreateLink({ from_block_id: drag.fromId, to_block_id: targetId, from_side: drag.fromSide, to_side: targetSide });
         }
         setPendingLink(null);
@@ -380,6 +493,7 @@ export default function RoadmapCanvas({
 
   const groups = (roadmap.blocks || []).filter((block) => block.kind === "group");
   const checkboxes = (roadmap.blocks || []).filter((block) => block.kind === "checkbox");
+  const texts = (roadmap.blocks || []).filter((block) => block.kind === "text");
   const blocks = (roadmap.blocks || []).filter((block) => block.kind === "block");
 
   return (
@@ -395,6 +509,9 @@ export default function RoadmapCanvas({
           </button>
           <button onClick={() => onAddGroupAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-group-btn">
             <Square size={14} /> {t("canvas.addGroup")}
+          </button>
+          <button onClick={() => onAddTextAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-text-btn">
+            <Type size={14} /> {t("canvas.addText")}
           </button>
           <span className="text-slate-400 text-xs">{t("canvas.toolbarHint")}</span>
         </div>
@@ -487,6 +604,36 @@ export default function RoadmapCanvas({
             );
           })}
 
+          {texts.map((block) => {
+            const point = positions[block.id] || block;
+            const merged = {
+              ...block,
+              x: point.x,
+              y: point.y,
+              width: point.width,
+              height: Math.max(point.height, textMinHeights[block.id] || 0),
+            };
+            return (
+              <TextNode
+                key={block.id}
+                block={merged}
+                isEditor={isEditor}
+                editMode={editMode}
+                onMouseDownText={onMouseDownBlock}
+                onResizeMouseDown={onResizeMouseDown}
+                onClick={onSelectBlock}
+                suppressClickRef={suppressClickRef}
+                onMeasureRef={(blockId, node) => {
+                  if (node) {
+                    textMeasureRefs.current[blockId] = node;
+                  } else {
+                    delete textMeasureRefs.current[blockId];
+                  }
+                }}
+              />
+            );
+          })}
+
           {blocks.map((block) => {
             const point = positions[block.id] || block;
             const styleCls = NODE_STYLES[block.node_style] || NODE_STYLES.primary;
@@ -574,6 +721,11 @@ export default function RoadmapCanvas({
             data-testid="ctx-add-group"
             onClick={() => { onAddGroupAt?.(menu.canvas.x - 160, menu.canvas.y - 90); setMenu(null); }}
           >{t("canvas.addGroupHere")}</button>
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
+            data-testid="ctx-add-text"
+            onClick={() => { onAddTextAt?.(menu.canvas.x - 160, menu.canvas.y - 40); setMenu(null); }}
+          >{t("canvas.addTextHere")}</button>
         </div>
       )}
 

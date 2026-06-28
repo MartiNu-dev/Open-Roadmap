@@ -102,8 +102,8 @@ oidc_logger = logging.getLogger("roadmap.oidc")
 app = FastAPI(title="Roadmap Platform API")
 api = APIRouter(prefix="/api")
 EXPORT_FORMAT = "open-roadmap-export"
-EXPORT_VERSION = 3
-SUPPORTED_IMPORT_VERSIONS = {1, 2, 3}
+EXPORT_VERSION = 4
+SUPPORTED_IMPORT_VERSIONS = {1, 2, 3, 4}
 FORBIDDEN_IMPORT_KEYS = {"id", "roadmap_id", "block_id", "from_block_id", "to_block_id"}
 ROADMAP_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 EDITOR_ROLES = ("admin", "editor")
@@ -509,6 +509,24 @@ def _normalize_visibility_mode(kind: str, visibility_mode: str) -> str:
     return VISIBLE_GROUP_MODE
 
 
+def _normalize_label_align(kind: str, label_align: str) -> str:
+    if kind == "text":
+        return label_align if label_align in {"left", "center", "right", "justify"} else "left"
+    return label_align if label_align in {"left", "center", "right"} else "center"
+
+
+def _normalize_font_settings(kind: str, font_size: str, font_size_px: Optional[int]) -> tuple[str, Optional[int]]:
+    if kind != "text":
+        if font_size == "custom":
+            return "base", None
+        return font_size, None
+    if font_size == "custom":
+        if font_size_px is None:
+            raise HTTPException(status_code=400, detail="Custom text size requires a pixel value")
+        return font_size, font_size_px
+    return font_size, None
+
+
 def _assert_linkable_block(block: RoadmapBlock, *, detail: str) -> None:
     if block.kind not in LINKABLE_BLOCK_KINDS:
         raise HTTPException(status_code=400, detail=detail)
@@ -584,8 +602,11 @@ def _validate_import_envelope(raw_payload: dict, source_name: str) -> RoadmapExp
             raise HTTPException(status_code=400, detail=f"{source_name}: link references unknown from_ref '{link.from_ref}'")
         if link.to_ref not in seen_refs:
             raise HTTPException(status_code=400, detail=f"{source_name}: link references unknown to_ref '{link.to_ref}'")
-        if block_kind_by_ref.get(link.from_ref) == "checkbox" or block_kind_by_ref.get(link.to_ref) == "checkbox":
-            raise HTTPException(status_code=400, detail=f"{source_name}: checkbox blocks cannot be linked")
+        if (
+            block_kind_by_ref.get(link.from_ref) not in LINKABLE_BLOCK_KINDS
+            or block_kind_by_ref.get(link.to_ref) not in LINKABLE_BLOCK_KINDS
+        ):
+            raise HTTPException(status_code=400, detail=f"{source_name}: only blocks and groups can be linked")
     return envelope
 
 
@@ -672,6 +693,7 @@ def _serialize_roadmap_export(
             checkbox_color=block.checkbox_color,
             text_color=block.text_color,
             font_size=block.font_size,
+            font_size_px=block.font_size_px,
             label_side=block.label_side,
             resources=[
                 RoadmapExportResource(
@@ -712,11 +734,11 @@ def _serialize_roadmap_export(
             )
             continue
         if (
-            any(block.ref == from_ref and block.kind == "checkbox" for block in export_blocks)
-            or any(block.ref == to_ref and block.kind == "checkbox" for block in export_blocks)
+            any(block.ref == from_ref and block.kind not in LINKABLE_BLOCK_KINDS for block in export_blocks)
+            or any(block.ref == to_ref and block.kind not in LINKABLE_BLOCK_KINDS for block in export_blocks)
         ):
             skipped_links += 1
-            logger.warning("Skipping checkbox link during export for roadmap %s", roadmap.slug)
+            logger.warning("Skipping non-linkable node link during export for roadmap %s", roadmap.slug)
             continue
         export_links.append(RoadmapExportLink(
             from_ref=from_ref,
@@ -881,14 +903,18 @@ def update_block_details(
         raise HTTPException(status_code=404, detail="Block not found")
     normalized_title = _normalize_block_title(payload.title, payload.kind)
     normalized_visibility_mode = _normalize_visibility_mode(payload.kind, payload.visibility_mode)
+    normalized_label_align = _normalize_label_align(payload.kind, payload.label_align)
+    normalized_font_size, normalized_font_size_px = _normalize_font_settings(payload.kind, payload.font_size, payload.font_size_px)
     for field in ("title", "short_description", "detailed_content", "level",
                   "estimated_duration", "node_style", "x", "y", "width", "height",
                   "kind", "bg_color", "border_color", "border_style", "border_thickness",
-                  "label_position", "label_align", "checkbox_color", "text_color",
-                  "font_size", "label_side"):
+                  "label_position", "checkbox_color", "text_color", "label_side"):
         setattr(block, field, getattr(payload, field))
     block.title = normalized_title
     block.visibility_mode = normalized_visibility_mode
+    block.label_align = normalized_label_align
+    block.font_size = normalized_font_size
+    block.font_size_px = normalized_font_size_px
     db.commit()
     db.refresh(block)
     return BlockOut.model_validate(block)
@@ -908,6 +934,8 @@ def create_block(
         raise HTTPException(status_code=404, detail="Roadmap not found")
     normalized_title = _normalize_block_title(payload.title, payload.kind)
     normalized_visibility_mode = _normalize_visibility_mode(payload.kind, payload.visibility_mode)
+    normalized_label_align = _normalize_label_align(payload.kind, payload.label_align)
+    normalized_font_size, normalized_font_size_px = _normalize_font_settings(payload.kind, payload.font_size, payload.font_size_px)
     max_order = db.query(func.max(RoadmapBlock.order_index)).filter(
         RoadmapBlock.roadmap_id == roadmap.id
     ).scalar()
@@ -922,9 +950,9 @@ def create_block(
         x=payload.x, y=payload.y, width=payload.width, height=payload.height,
         kind=payload.kind, visibility_mode=normalized_visibility_mode, bg_color=payload.bg_color,
         border_color=payload.border_color, border_style=payload.border_style, border_thickness=payload.border_thickness,
-        label_position=payload.label_position, label_align=payload.label_align,
+        label_position=payload.label_position, label_align=normalized_label_align,
         checkbox_color=payload.checkbox_color, text_color=payload.text_color,
-        font_size=payload.font_size, label_side=payload.label_side,
+        font_size=normalized_font_size, font_size_px=normalized_font_size_px, label_side=payload.label_side,
         order_index=(max_order or 0) + 1,
     )
     db.add(block)
@@ -1245,6 +1273,11 @@ async def import_roadmaps(
             block_id_by_ref = {}
             for block in sorted(roadmap.blocks, key=lambda entry: (entry.order_index, entry.ref)):
                 normalized_title = _normalize_block_title(block.title, block.kind)
+                normalized_font_size, normalized_font_size_px = _normalize_font_settings(
+                    block.kind,
+                    block.font_size,
+                    block.font_size_px,
+                )
                 imported_block = RoadmapBlock(
                     roadmap_id=imported.id,
                     title=normalized_title,
@@ -1265,10 +1298,11 @@ async def import_roadmaps(
                     border_style=block.border_style,
                     border_thickness=block.border_thickness,
                     label_position=block.label_position,
-                    label_align=block.label_align,
+                    label_align=_normalize_label_align(block.kind, block.label_align),
                     checkbox_color=block.checkbox_color,
                     text_color=block.text_color,
-                    font_size=block.font_size,
+                    font_size=normalized_font_size,
+                    font_size_px=normalized_font_size_px,
                     label_side=block.label_side,
                 )
                 db.add(imported_block)

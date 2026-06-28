@@ -26,6 +26,10 @@ export function getAlignmentLabel(t, align) {
   return t(`roadmaps:blockPanel.aligns.${align}`);
 }
 
+export function getCanvasFontSizeLabel(t, fontSize) {
+  return t(`roadmaps:blockPanel.fontSizes.${fontSize}`);
+}
+
 export function getRoleLabel(t, role) {
   return t(`common:roles.${role}`);
 }

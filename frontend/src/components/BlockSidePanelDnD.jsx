@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import {
   getAlignmentLabel,
   getBlockStyleLabel,
+  getCanvasFontSizeLabel,
   getLevelLabel,
   getPositionLabel,
   getProgressStatusLabel,
@@ -188,6 +189,7 @@ export default function BlockSidePanelDnD({
         checkbox_color: block.checkbox_color || "#111827",
         text_color: block.text_color || "#0f172a",
         font_size: block.font_size || "base",
+        font_size_px: block.font_size_px ?? null,
         label_side: block.label_side || "right",
       });
     }
@@ -217,11 +219,13 @@ export default function BlockSidePanelDnD({
       || (form.checkbox_color !== (block.checkbox_color || "#111827"))
       || (form.text_color !== (block.text_color || "#0f172a"))
       || (form.font_size !== (block.font_size || "base"))
+      || ((form.font_size_px ?? null) !== (block.font_size_px ?? null))
       || (form.label_side !== (block.label_side || "right"));
     if (!changed) return;
 
     const isGroup = block.kind === "group";
     if (!isGroup && (!form.title || !form.title.trim())) return;
+    if (block.kind === "text" && form.font_size === "custom" && !form.font_size_px) return;
     const timeoutId = setTimeout(() => onSave?.(form), 500);
     return () => clearTimeout(timeoutId);
   }, [form, canManage, block, onSave]);
@@ -230,7 +234,8 @@ export default function BlockSidePanelDnD({
 
   const isTrackableBlock = block.kind === "block" || block.kind === "checkbox";
   const isCheckbox = block.kind === "checkbox";
-  const panelTitle = block.title || (block.kind === "group" ? t("blockPanel.untitledGroup") : "");
+  const isText = block.kind === "text";
+  const panelTitle = isText ? t("blockPanel.freeText") : (block.title || (block.kind === "group" ? t("blockPanel.untitledGroup") : ""));
   const status = progress?.status || "not_started";
   const resources = sortResources(block.resources || []);
   const canReorderResources = canManage && resources.length > 1 && typeof onReorderResources === "function";
@@ -461,7 +466,7 @@ export default function BlockSidePanelDnD({
                       data-testid="edit-checkbox-font-size"
                     >
                       {FONT_SIZE_OPTIONS.map((fontSize) => (
-                        <option key={fontSize} value={fontSize}>{t(`blockPanel.fontSizes.${fontSize}`)}</option>
+                        <option key={fontSize} value={fontSize}>{getCanvasFontSizeLabel(t, fontSize)}</option>
                       ))}
                     </select>
                   </div>
@@ -483,6 +488,79 @@ export default function BlockSidePanelDnD({
                   <span className="text-xs text-slate-500 italic">{saving ? t("blockPanel.saving") : t("blockPanel.autoSaves")}</span>
                   <Button variant="outline" onClick={onDelete} data-testid="edit-checkbox-delete-btn" className="ml-auto">
                     <Trash2 size={14} className="mr-1 text-red-600" /> {t("blockPanel.deleteCheckbox")}
+                  </Button>
+                </div>
+              </div>
+            ) : isText ? (
+              <div className="space-y-4" data-testid="text-editor-form">
+                <div>
+                  <Label>{t("blockPanel.textContent")}</Label>
+                  <Textarea
+                    rows={6}
+                    value={form.title}
+                    onChange={(e) => setField("title", e.target.value)}
+                    data-testid="edit-text-content"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("blockPanel.textColor")}</Label>
+                    <input
+                      type="color"
+                      value={form.text_color}
+                      onChange={(e) => setField("text_color", e.target.value)}
+                      className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white p-1 cursor-pointer"
+                      data-testid="edit-text-color"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("blockPanel.textAlignment")}</Label>
+                    <select
+                      className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                      value={form.label_align}
+                      onChange={(e) => setField("label_align", e.target.value)}
+                      data-testid="edit-text-align"
+                    >
+                      {ALIGNS.concat("justify").map((align) => (
+                        <option key={align} value={align}>{getAlignmentLabel(t, align)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("blockPanel.fontSize")}</Label>
+                    <select
+                      className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                      value={form.font_size}
+                      onChange={(e) => setField("font_size", e.target.value)}
+                      data-testid="edit-text-font-size"
+                    >
+                      {FONT_SIZE_OPTIONS.concat("custom").map((fontSize) => (
+                        <option key={fontSize} value={fontSize}>{getCanvasFontSizeLabel(t, fontSize)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>{t("blockPanel.customFontSizePx")}</Label>
+                    <Input
+                      type="number"
+                      min="8"
+                      max="160"
+                      value={form.font_size_px ?? ""}
+                      disabled={form.font_size !== "custom"}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setField("font_size_px", nextValue ? Number(nextValue) : null);
+                      }}
+                      data-testid="edit-text-font-size-px"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2 items-center">
+                  <span className="text-xs text-slate-500 italic">{saving ? t("blockPanel.saving") : t("blockPanel.autoSaves")}</span>
+                  <Button variant="outline" onClick={onDelete} data-testid="edit-text-delete-btn" className="ml-auto">
+                    <Trash2 size={14} className="mr-1 text-red-600" /> {t("blockPanel.deleteText")}
                   </Button>
                 </div>
               </div>

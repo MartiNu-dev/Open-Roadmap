@@ -6,9 +6,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 Role = Literal["admin", "editor", "user"]
 ProgressStatus = Literal["not_started", "in_progress", "completed"]
 VisibilityMode = Literal["visible", "transparent"]
-BlockKind = Literal["block", "group", "checkbox"]
-CheckboxFontSize = Literal["xs", "sm", "base", "lg", "xl"]
+BlockKind = Literal["block", "group", "checkbox", "text"]
+CanvasFontSize = Literal["xs", "sm", "base", "lg", "xl", "custom"]
 LabelSide = Literal["left", "right"]
+TextAlign = Literal["left", "center", "right", "justify"]
 
 
 # ---------- Auth ----------
@@ -139,10 +140,11 @@ class BlockOut(BaseModel):
     border_style: str = "solid"
     border_thickness: str = "small"
     label_position: str = "bottom"
-    label_align: str = "center"
+    label_align: TextAlign = "center"
     checkbox_color: str = "#111827"
     text_color: str = "#0f172a"
-    font_size: CheckboxFontSize = "base"
+    font_size: CanvasFontSize = "base"
+    font_size_px: Optional[int] = None
     label_side: LabelSide = "right"
     resources: List[ResourceOut] = []
 
@@ -169,7 +171,7 @@ class BlockPositionIn(BaseModel):
 
 
 class BlockUpsertIn(BaseModel):
-    title: str = Field(default="", max_length=120)
+    title: str = Field(default="", max_length=5000)
     short_description: str = ""
     detailed_content: str = ""
     level: str = ""
@@ -186,10 +188,11 @@ class BlockUpsertIn(BaseModel):
     border_style: Literal["solid", "dashed", "dotted"] = "solid"
     border_thickness: Literal["small", "medium", "large"] = "small"
     label_position: Literal["top", "bottom"] = "bottom"
-    label_align: Literal["left", "center", "right"] = "center"
+    label_align: TextAlign = "center"
     checkbox_color: str = "#111827"
     text_color: str = "#0f172a"
-    font_size: CheckboxFontSize = "base"
+    font_size: CanvasFontSize = "base"
+    font_size_px: Optional[int] = Field(default=None, ge=8, le=160)
     label_side: LabelSide = "right"
 
 
@@ -326,10 +329,11 @@ class RoadmapExportBlock(BaseModel):
     border_style: Literal["solid", "dashed", "dotted"] = "solid"
     border_thickness: Literal["small", "medium", "large"] = "small"
     label_position: str = "bottom"
-    label_align: str = "center"
+    label_align: TextAlign = "center"
     checkbox_color: str = "#111827"
     text_color: str = "#0f172a"
-    font_size: CheckboxFontSize = "base"
+    font_size: CanvasFontSize = "base"
+    font_size_px: Optional[int] = None
     label_side: LabelSide = "right"
     resources: List[RoadmapExportResource] = []
 

@@ -107,7 +107,8 @@
     "aligns": {
       "left": "Left",
       "center": "Center",
-      "right": "Right"
+      "right": "Right",
+      "justify": "Justify"
     },
     "labelOptional": "Label (optional)",
     "untitledGroup": "Untitled group",
@@ -140,16 +141,21 @@
       "sm": "Small",
       "base": "Base",
       "lg": "Large",
-      "xl": "Extra large"
+      "xl": "Extra large",
+      "custom": "Custom"
     },
     "labelSide": "Text side",
+    "customFontSizePx": "Custom size (px)",
+    "textContent": "Text content",
     "saving": "Saving...",
     "autoSaves": "Auto-saves as you type",
     "deleteGroup": "Delete group",
     "deleteBlock": "Delete block",
     "deleteCheckbox": "Delete checkbox",
+    "deleteText": "Delete text",
     "title": "Title",
     "checkboxText": "Checkbox text",
+    "freeText": "Free text",
     "shortDescription": "Short description",
     "detailedContent": "Detailed content",
     "markdownHelp": "Supports Markdown - headings, **bold**, lists, [links](url), `code`, tables...",
@@ -175,10 +181,12 @@
     "addBlock": "Add block",
     "addCheckbox": "Add checkbox",
     "addGroup": "Add group",
+    "addText": "Add text",
     "toolbarHint": "double-click empty area | drag side handles to link | drag corners to resize | hold SHIFT to snap to grid",
     "addBlockHere": "+ Add block here",
     "addCheckboxHere": "+ Add checkbox here",
     "addGroupHere": "+ Add group here",
+    "addTextHere": "+ Add text here",
     "tip": "Tip: drag side handles to link | drag corners to resize | hold SHIFT to snap to the 24px grid."
   }
 }

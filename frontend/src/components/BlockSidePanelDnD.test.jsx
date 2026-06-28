@@ -42,6 +42,7 @@ function renderPanel(props = {}) {
     checkbox_color: "#111827",
     text_color: "#0f172a",
     font_size: "base",
+    font_size_px: null,
     label_side: "right",
     ...blockOverrides,
   };
@@ -147,6 +148,56 @@ describe("BlockSidePanelDnD checkbox editor", () => {
       text_color: "#2563eb",
       font_size: "xl",
       label_side: "left",
+    }));
+  });
+});
+
+describe("BlockSidePanelDnD text editor", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
+  it("renders text controls and autosaves free-text changes", () => {
+    const { onSave } = renderPanel({
+      block: {
+        id: "text-1",
+        title: "Initial text",
+        kind: "text",
+        label_align: "left",
+        text_color: "#0f172a",
+        font_size: "base",
+        font_size_px: null,
+      },
+    });
+
+    expect(screen.getByTestId("text-editor-form")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-text-content")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-text-color")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-text-align")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-text-font-size")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-text-font-size-px")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("edit-text-content"), { target: { value: "Updated free text" } });
+    fireEvent.change(screen.getByTestId("edit-text-color"), { target: { value: "#2563eb" } });
+    fireEvent.change(screen.getByTestId("edit-text-align"), { target: { value: "justify" } });
+    fireEvent.change(screen.getByTestId("edit-text-font-size"), { target: { value: "custom" } });
+    fireEvent.change(screen.getByTestId("edit-text-font-size-px"), { target: { value: "28" } });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Updated free text",
+      text_color: "#2563eb",
+      label_align: "justify",
+      font_size: "custom",
+      font_size_px: 28,
     }));
   });
 });

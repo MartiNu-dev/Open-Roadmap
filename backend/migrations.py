@@ -60,6 +60,7 @@ def run_migrations(engine: Engine) -> None:
         "checkbox_color": "VARCHAR NOT NULL DEFAULT '#111827'",
         "text_color": "VARCHAR NOT NULL DEFAULT '#0f172a'",
         "font_size": "VARCHAR NOT NULL DEFAULT 'base'",
+        "font_size_px": "INTEGER",
         "label_side": "VARCHAR NOT NULL DEFAULT 'right'",
     }
     link_cols = {c["name"] for c in insp.get_columns("roadmap_links")} if "roadmap_links" in insp.get_table_names() else set()

@@ -107,7 +107,8 @@
     "aligns": {
       "left": "Gauche",
       "center": "Centre",
-      "right": "Droite"
+      "right": "Droite",
+      "justify": "Justifié"
     },
     "labelOptional": "Libellé (optionnel)",
     "untitledGroup": "Groupe sans nom",
@@ -140,16 +141,21 @@
       "sm": "Petite",
       "base": "Normale",
       "lg": "Grande",
-      "xl": "Très grande"
+      "xl": "Très grande",
+      "custom": "Personnalisée"
     },
     "labelSide": "Côté du texte",
+    "customFontSizePx": "Taille personnalisée (px)",
+    "textContent": "Contenu du texte",
     "saving": "Enregistrement...",
     "autoSaves": "Enregistrement automatique pendant la saisie",
     "deleteGroup": "Supprimer le groupe",
     "deleteBlock": "Supprimer le bloc",
     "deleteCheckbox": "Supprimer la checkbox",
+    "deleteText": "Supprimer le texte",
     "title": "Titre",
     "checkboxText": "Texte de la checkbox",
+    "freeText": "Texte libre",
     "shortDescription": "Description courte",
     "detailedContent": "Contenu détaillé",
     "markdownHelp": "Supporte Markdown - titres, **gras**, listes, [liens](url), `code`, tableaux...",
@@ -175,10 +181,12 @@
     "addBlock": "Ajouter un bloc",
     "addCheckbox": "Ajouter une checkbox",
     "addGroup": "Ajouter un groupe",
+    "addText": "Ajouter un texte",
     "toolbarHint": "double-cliquez dans une zone vide | glissez les poignées latérales pour lier | glissez les coins pour redimensionner | maintenez SHIFT pour aligner sur la grille",
     "addBlockHere": "+ Ajouter un bloc ici",
     "addCheckboxHere": "+ Ajouter une checkbox ici",
     "addGroupHere": "+ Ajouter un groupe ici",
+    "addTextHere": "+ Ajouter un texte ici",
     "tip": "Astuce : glissez les poignées latérales pour lier | glissez les coins pour redimensionner | maintenez SHIFT pour aligner sur la grille de 24 px."
   }
 }
