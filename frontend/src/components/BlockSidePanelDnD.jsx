@@ -421,6 +421,16 @@ export default function BlockSidePanelDnD({
                     </select>
                   </div>
                 </div>
+                <div>
+                  <Label>{t("blockPanel.textColor")}</Label>
+                  <input
+                    type="color"
+                    value={form.text_color}
+                    onChange={(e) => setField("text_color", e.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white p-1 cursor-pointer"
+                    data-testid="edit-group-text-color"
+                  />
+                </div>
                 <div className="flex gap-2 pt-2 items-center">
                   <span className="text-xs text-slate-500 italic">{saving ? t("blockPanel.saving") : t("blockPanel.autoSaves")}</span>
                   <Button variant="outline" onClick={onDelete} data-testid="edit-group-delete-btn" className="ml-auto">

@@ -58,7 +58,7 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
   const labelTop = block.label_position === "top";
   const align = block.label_align || "center";
   const alignCls = align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center";
-  const labelStyle = { color: "#fff" };
+  const labelStyle = { color: block.text_color || "#ffffff" };
   const isTransparent = block.visibility_mode === "transparent";
   const isEditInteractive = isEditor && editMode;
   const isInteractive = !isTransparent || isEditInteractive;
@@ -86,23 +86,23 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
       {showTransparentChrome ? (
         <div className="relative flex h-full w-full flex-col rounded-md border border-dashed border-slate-300 bg-white/40" data-testid={`canvas-group-box-${block.id}`}>
           {showLabel && labelTop && (
-            <div className={labelClassName} style={{ color: "#475569" }} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
+            <div className={labelClassName} style={labelStyle} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
           )}
           <div className="flex flex-1 items-center justify-center">
             <Ghost size={22} className="text-slate-400" data-testid={`canvas-group-ghost-${block.id}`} />
           </div>
           {showLabel && !labelTop && (
-            <div className={labelClassName} style={{ color: "#475569" }} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
+            <div className={labelClassName} style={labelStyle} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
           )}
         </div>
       ) : isTransparent ? null : (
         <div className="relative w-full h-full rounded-md border flex flex-col" style={groupStyle} data-testid={`canvas-group-box-${block.id}`}>
           {showLabel && labelTop && (
-            <div className={labelClassName} style={labelStyle}>{block.title}</div>
+            <div className={labelClassName} style={labelStyle} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
           )}
           <div className="flex-1" />
           {showLabel && !labelTop && (
-            <div className={labelClassName} style={labelStyle}>{block.title}</div>
+            <div className={labelClassName} style={labelStyle} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
           )}
         </div>
       )}

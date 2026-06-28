@@ -104,6 +104,22 @@ describe("BlockSidePanelDnD group borders", () => {
       border_color: "#ef4444",
     }));
   });
+
+  it("renders text color control and autosaves group text color changes", () => {
+    const { onSave } = renderPanel();
+
+    expect(screen.getByTestId("edit-group-text-color")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("edit-group-text-color"), { target: { value: "#1f2937" } });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      text_color: "#1f2937",
+    }));
+  });
 });
 
 describe("BlockSidePanelDnD checkbox editor", () => {

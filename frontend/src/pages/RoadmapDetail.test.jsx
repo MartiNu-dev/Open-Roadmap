@@ -12,13 +12,16 @@ jest.mock("../context/AuthContext", () => ({
   useAuth: jest.fn(),
 }));
 jest.mock("@/components/Navbar", () => () => <div data-testid="navbar" />);
-jest.mock("@/components/RoadmapCanvas", () => ({ onSelectLink, onSelectBlock }) => (
+jest.mock("@/components/RoadmapCanvas", () => ({ onSelectLink, onSelectBlock, onAddGroupAt }) => (
   <div data-testid="roadmap-canvas">
     <button data-testid="mock-select-link-btn" onClick={() => onSelectLink?.({ id: "link-1" })}>
       select link
     </button>
     <button data-testid="mock-select-block-btn" onClick={() => onSelectBlock?.({ id: "block-1", kind: "block" })}>
       select block
+    </button>
+    <button data-testid="mock-add-group-btn" onClick={() => onAddGroupAt?.(120, 80)}>
+      add group
     </button>
   </div>
 ));
@@ -192,6 +195,77 @@ describe("RoadmapDetail", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("link-side-panel")).not.toBeInTheDocument();
       expect(screen.getByTestId("link-side-panel-state")).toHaveTextContent("open:false|link:none");
+    });
+  });
+
+  it("creates new groups with white text by default", async () => {
+    api.get.mockImplementation((url) => {
+      if (url === "/admin/roadmaps/detail/draft-roadmap") {
+        return Promise.resolve({
+          data: {
+            id: "rm-1",
+            slug: "draft-roadmap",
+            title: "Draft roadmap",
+            description: "Hidden from the public",
+            status: "draft",
+            cover_emoji: "T",
+            tags: "",
+            level: "mixed",
+            blocks: [],
+            links: [],
+          },
+        });
+      }
+      if (url === "/progress/me/rm-1") {
+        return Promise.resolve({ data: { items: [] } });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    api.post.mockResolvedValue({
+      data: {
+        id: "group-1",
+        roadmap_id: "rm-1",
+        title: "Group",
+        kind: "group",
+        visibility_mode: "visible",
+        bg_color: "#0f172a",
+        text_color: "#ffffff",
+        border_color: "#94a3b8",
+        border_style: "solid",
+        border_thickness: "small",
+        label_position: "bottom",
+        label_align: "center",
+        x: 120,
+        y: 80,
+        width: 360,
+        height: 200,
+        short_description: "",
+        detailed_content: "",
+        level: "",
+        estimated_duration: "",
+        node_style: "primary",
+        checkbox_color: "#111827",
+        font_size: "base",
+        font_size_px: null,
+        label_side: "right",
+        resources: [],
+      },
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("roadmap-title")).toHaveTextContent("Draft roadmap");
+    });
+
+    fireEvent.click(screen.getByTestId("toggle-edit-mode-btn"));
+    fireEvent.click(screen.getByTestId("mock-add-group-btn"));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith("/roadmaps/rm-1/blocks", expect.objectContaining({
+        kind: "group",
+        text_color: "#ffffff",
+      }));
     });
   });
 });

@@ -40,6 +40,25 @@ def _ensure_nullable_password_hash(engine: Engine) -> None:
         conn.execute(text("PRAGMA foreign_keys=ON"))
 
 
+def _backfill_group_text_color(engine: Engine) -> None:
+    insp = inspect(engine)
+    if "roadmap_blocks" not in insp.get_table_names():
+        return
+
+    cols = {col["name"] for col in insp.get_columns("roadmap_blocks")}
+    if "kind" not in cols or "text_color" not in cols:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text(
+            """
+            UPDATE roadmap_blocks
+            SET text_color = '#ffffff'
+            WHERE kind = 'group' AND text_color = '#0f172a'
+            """
+        ))
+
+
 def run_migrations(engine: Engine) -> None:
     insp = inspect(engine)
     cols = {c["name"] for c in insp.get_columns("roadmap_blocks")}
@@ -120,3 +139,4 @@ def run_migrations(engine: Engine) -> None:
             """
         ))
     _ensure_nullable_password_hash(engine)
+    _backfill_group_text_color(engine)

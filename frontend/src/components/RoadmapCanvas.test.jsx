@@ -39,6 +39,7 @@ function buildRoadmap(visibilityMode = "transparent", overrides = {}) {
         border_thickness: "small",
         label_position: "top",
         label_align: "center",
+        text_color: "#ffffff",
         resources: [],
         ...overrides,
       },
@@ -225,6 +226,7 @@ describe("RoadmapCanvas transparent groups", () => {
         border_color: "#ef4444",
         border_style: "dashed",
         border_thickness: "large",
+        text_color: "#1f2937",
       }),
       progressByBlock: {},
       isEditor: false,
@@ -237,6 +239,42 @@ describe("RoadmapCanvas transparent groups", () => {
     expect(groupBox.style.borderColor).toBe("#ef4444");
     expect(groupBox.style.borderStyle).toBe("dashed");
     expect(groupBox.style.borderWidth).toBe("4px");
+    expect(screen.getByTestId("canvas-group-label-group-1")).toHaveStyle({
+      color: "rgb(31, 41, 55)",
+    });
+  });
+
+  it("keeps visible group labels readable on light backgrounds", () => {
+    renderCanvas({
+      roadmap: buildRoadmap("visible", {
+        bg_color: "#ffffff",
+        text_color: "#111827",
+      }),
+      progressByBlock: {},
+      isEditor: false,
+      editMode: false,
+      onSelectBlock: jest.fn(),
+    });
+
+    expect(screen.getByTestId("canvas-group-label-group-1")).toHaveStyle({
+      color: "rgb(17, 24, 39)",
+    });
+  });
+
+  it("uses configured text color for transparent group labels in edit mode", () => {
+    renderCanvas({
+      roadmap: buildRoadmap("transparent", {
+        text_color: "#2563eb",
+      }),
+      progressByBlock: {},
+      isEditor: true,
+      editMode: true,
+      onSelectBlock: jest.fn(),
+    });
+
+    expect(screen.getByTestId("canvas-group-label-group-1")).toHaveStyle({
+      color: "rgb(37, 99, 235)",
+    });
   });
 });
 

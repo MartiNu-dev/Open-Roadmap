@@ -77,6 +77,7 @@ class TestCreateGroup:
                 "kind": "group",
                 "visibility_mode": "transparent",
                 "bg_color": "#1e3a8a",
+                "text_color": "#f8fafc",
                 "border_color": "#ef4444",
                 "border_style": "dashed",
                 "border_thickness": "large",
@@ -93,6 +94,7 @@ class TestCreateGroup:
             assert body["kind"] == "group"
             assert body["visibility_mode"] == "transparent"
             assert body["bg_color"] == "#1e3a8a"
+            assert body["text_color"] == "#f8fafc"
             assert body["border_color"] == "#ef4444"
             assert body["border_style"] == "dashed"
             assert body["border_thickness"] == "large"
@@ -110,6 +112,7 @@ class TestCreateGroup:
             assert m["kind"] == "group"
             assert m["visibility_mode"] == "transparent"
             assert m["bg_color"] == "#1e3a8a"
+            assert m["text_color"] == "#f8fafc"
             assert m["border_color"] == "#ef4444"
             assert m["border_style"] == "dashed"
             assert m["border_thickness"] == "large"
@@ -136,6 +139,22 @@ class TestDefaultsSmallerHeight:
             assert body["height"] == 44, f"expected height=44 (smaller than old 64), got {body['height']}"
             # kind defaults to 'block'
             assert body["kind"] == "block"
+        finally:
+            for bid in created_ids:
+                s.delete(f"{API}/blocks/{bid}", headers=_csrf_headers(s))
+
+    def test_create_group_without_text_color_defaults_to_white(self):
+        s = _login(EDITOR)
+        rid, _ = _frontend_id(s)
+        created_ids = []
+        try:
+            payload = {"title": "TEST_group_default_text_phase8", "kind": "group"}
+            r = s.post(f"{API}/roadmaps/{rid}/blocks", json=payload, headers=_csrf_headers(s))
+            assert r.status_code == 201, r.text
+            body = r.json()
+            created_ids.append(body["id"])
+            assert body["kind"] == "group"
+            assert body["text_color"] == "#ffffff"
         finally:
             for bid in created_ids:
                 s.delete(f"{API}/blocks/{bid}", headers=_csrf_headers(s))

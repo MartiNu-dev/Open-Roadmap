@@ -527,6 +527,12 @@ def _normalize_font_settings(kind: str, font_size: str, font_size_px: Optional[i
     return font_size, None
 
 
+def _normalize_text_color(kind: str, text_color: str) -> str:
+    if kind == "group" and text_color == "#0f172a":
+        return "#ffffff"
+    return text_color
+
+
 def _assert_linkable_block(block: RoadmapBlock, *, detail: str) -> None:
     if block.kind not in LINKABLE_BLOCK_KINDS:
         raise HTTPException(status_code=400, detail=detail)
@@ -905,6 +911,7 @@ def update_block_details(
     normalized_visibility_mode = _normalize_visibility_mode(payload.kind, payload.visibility_mode)
     normalized_label_align = _normalize_label_align(payload.kind, payload.label_align)
     normalized_font_size, normalized_font_size_px = _normalize_font_settings(payload.kind, payload.font_size, payload.font_size_px)
+    normalized_text_color = _normalize_text_color(payload.kind, payload.text_color)
     for field in ("title", "short_description", "detailed_content", "level",
                   "estimated_duration", "node_style", "x", "y", "width", "height",
                   "kind", "bg_color", "border_color", "border_style", "border_thickness",
@@ -913,6 +920,7 @@ def update_block_details(
     block.title = normalized_title
     block.visibility_mode = normalized_visibility_mode
     block.label_align = normalized_label_align
+    block.text_color = normalized_text_color
     block.font_size = normalized_font_size
     block.font_size_px = normalized_font_size_px
     db.commit()
@@ -936,6 +944,7 @@ def create_block(
     normalized_visibility_mode = _normalize_visibility_mode(payload.kind, payload.visibility_mode)
     normalized_label_align = _normalize_label_align(payload.kind, payload.label_align)
     normalized_font_size, normalized_font_size_px = _normalize_font_settings(payload.kind, payload.font_size, payload.font_size_px)
+    normalized_text_color = _normalize_text_color(payload.kind, payload.text_color)
     max_order = db.query(func.max(RoadmapBlock.order_index)).filter(
         RoadmapBlock.roadmap_id == roadmap.id
     ).scalar()
@@ -951,7 +960,7 @@ def create_block(
         kind=payload.kind, visibility_mode=normalized_visibility_mode, bg_color=payload.bg_color,
         border_color=payload.border_color, border_style=payload.border_style, border_thickness=payload.border_thickness,
         label_position=payload.label_position, label_align=normalized_label_align,
-        checkbox_color=payload.checkbox_color, text_color=payload.text_color,
+        checkbox_color=payload.checkbox_color, text_color=normalized_text_color,
         font_size=normalized_font_size, font_size_px=normalized_font_size_px, label_side=payload.label_side,
         order_index=(max_order or 0) + 1,
     )
@@ -1278,6 +1287,7 @@ async def import_roadmaps(
                     block.font_size,
                     block.font_size_px,
                 )
+                normalized_text_color = _normalize_text_color(block.kind, block.text_color)
                 imported_block = RoadmapBlock(
                     roadmap_id=imported.id,
                     title=normalized_title,
@@ -1300,7 +1310,7 @@ async def import_roadmaps(
                     label_position=block.label_position,
                     label_align=_normalize_label_align(block.kind, block.label_align),
                     checkbox_color=block.checkbox_color,
-                    text_color=block.text_color,
+                    text_color=normalized_text_color,
                     font_size=normalized_font_size,
                     font_size_px=normalized_font_size_px,
                     label_side=block.label_side,
