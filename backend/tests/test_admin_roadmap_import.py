@@ -169,6 +169,7 @@ class TestAdminRoadmapImport:
                         "height": 44,
                         "node_style": "primary",
                         "kind": "block",
+                        "visibility_mode": "visible",
                         "bg_color": "#0f172a",
                         "label_position": "bottom",
                         "label_align": "center",
@@ -229,6 +230,7 @@ class TestAdminRoadmapImport:
                         "height": 44,
                         "node_style": "primary",
                         "kind": "block",
+                        "visibility_mode": "visible",
                         "bg_color": "#0f172a",
                         "label_position": "bottom",
                         "label_align": "center",
@@ -280,6 +282,119 @@ class TestAdminRoadmapImport:
             after = len(_admin_roadmaps(editor))
             assert response.status_code == 400, response.text
             assert before == after
+        finally:
+            _delete_by_slug(admin, slug)
+            for suffix in range(2, 6):
+                _delete_by_slug(admin, f"{slug}-{suffix}")
+
+    def test_import_v1_defaults_group_visibility_to_visible(self):
+        editor = _login(EDITOR)
+        admin = _login(ADMIN)
+        slug = f"import-v1-group-{uuid.uuid4().hex[:8]}"
+        payload = {
+            "format": "open-roadmap-export",
+            "version": 1,
+            "exported_at": "2026-06-24T12:00:00Z",
+            "roadmap": {
+                "slug": slug,
+                "title": "Legacy group visibility",
+                "description": "",
+                "status": "published",
+                "cover_emoji": "🧪",
+                "tags": "",
+                "level": "mixed",
+                "blocks": [
+                    {
+                        "ref": "group-001",
+                        "title": "",
+                        "short_description": "",
+                        "detailed_content": "",
+                        "level": "",
+                        "estimated_duration": "",
+                        "order_index": 1,
+                        "x": 0,
+                        "y": 0,
+                        "width": 220,
+                        "height": 44,
+                        "node_style": "primary",
+                        "kind": "group",
+                        "bg_color": "#0f172a",
+                        "label_position": "bottom",
+                        "label_align": "center",
+                        "resources": [],
+                    }
+                ],
+                "links": [],
+            },
+        }
+
+        try:
+            response = _import_file(editor, "legacy-group.json", json.dumps(payload).encode("utf-8"), "application/json")
+            assert response.status_code == 200, response.text
+            created_slug = response.json()["roadmaps"][0]["slug_final"]
+            detail = editor.get(f"{API}/admin/roadmaps/detail/{created_slug}", timeout=REQUEST_TIMEOUT_SECONDS)
+            assert detail.status_code == 200, detail.text
+            block = detail.json()["blocks"][0]
+            assert block["kind"] == "group"
+            assert block["visibility_mode"] == "visible"
+            assert block["title"] == ""
+        finally:
+            _delete_by_slug(admin, slug)
+            for suffix in range(2, 6):
+                _delete_by_slug(admin, f"{slug}-{suffix}")
+
+    def test_import_v2_restores_transparent_group_visibility(self):
+        editor = _login(EDITOR)
+        admin = _login(ADMIN)
+        slug = f"import-v2-group-{uuid.uuid4().hex[:8]}"
+        payload = {
+            "format": "open-roadmap-export",
+            "version": 2,
+            "exported_at": "2026-06-24T12:00:00Z",
+            "roadmap": {
+                "slug": slug,
+                "title": "Transparent group visibility",
+                "description": "",
+                "status": "published",
+                "cover_emoji": "🧪",
+                "tags": "",
+                "level": "mixed",
+                "blocks": [
+                    {
+                        "ref": "group-001",
+                        "title": "",
+                        "short_description": "",
+                        "detailed_content": "",
+                        "level": "",
+                        "estimated_duration": "",
+                        "order_index": 1,
+                        "x": 0,
+                        "y": 0,
+                        "width": 220,
+                        "height": 44,
+                        "node_style": "primary",
+                        "kind": "group",
+                        "visibility_mode": "transparent",
+                        "bg_color": "#0f172a",
+                        "label_position": "bottom",
+                        "label_align": "center",
+                        "resources": [],
+                    }
+                ],
+                "links": [],
+            },
+        }
+
+        try:
+            response = _import_file(editor, "transparent-group.json", json.dumps(payload).encode("utf-8"), "application/json")
+            assert response.status_code == 200, response.text
+            created_slug = response.json()["roadmaps"][0]["slug_final"]
+            detail = editor.get(f"{API}/admin/roadmaps/detail/{created_slug}", timeout=REQUEST_TIMEOUT_SECONDS)
+            assert detail.status_code == 200, detail.text
+            block = detail.json()["blocks"][0]
+            assert block["kind"] == "group"
+            assert block["visibility_mode"] == "transparent"
+            assert block["title"] == ""
         finally:
             _delete_by_slug(admin, slug)
             for suffix in range(2, 6):

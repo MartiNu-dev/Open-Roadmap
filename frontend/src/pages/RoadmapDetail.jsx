@@ -178,7 +178,7 @@ export default function RoadmapDetail() {
       const { data } = await api.post(`/roadmaps/${roadmap.id}/blocks`, {
         title: "Group", short_description: "", detailed_content: "",
         level: "", estimated_duration: "", node_style: "primary",
-        kind: "group", bg_color: "#0f172a", label_position: "bottom", label_align: "center",
+        kind: "group", visibility_mode: "visible", bg_color: "#0f172a", label_position: "bottom", label_align: "center",
         x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), width: 360, height: 200,
       });
       setRoadmap((current) => ({ ...current, blocks: [...current.blocks, data] }));
@@ -245,7 +245,9 @@ export default function RoadmapDetail() {
   };
 
   const handleDeleteBlock = async () => {
-    if (!selectedBlock || !window.confirm(t("roadmaps:detail.deleteBlockConfirm", { title: selectedBlock.title }))) return;
+    if (!selectedBlock) return;
+    const displayTitle = selectedBlock.title || (selectedBlock.kind === "group" ? t("roadmaps:blockPanel.untitledGroup") : "");
+    if (!window.confirm(t("roadmaps:detail.deleteBlockConfirm", { title: displayTitle }))) return;
     try {
       await api.delete(`/blocks/${selectedBlock.id}`);
       setRoadmap((current) => ({

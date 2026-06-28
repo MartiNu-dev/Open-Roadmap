@@ -102,12 +102,15 @@ oidc_logger = logging.getLogger("roadmap.oidc")
 app = FastAPI(title="Roadmap Platform API")
 api = APIRouter(prefix="/api")
 EXPORT_FORMAT = "open-roadmap-export"
-EXPORT_VERSION = 1
+EXPORT_VERSION = 2
+SUPPORTED_IMPORT_VERSIONS = {1, 2}
 FORBIDDEN_IMPORT_KEYS = {"id", "roadmap_id", "block_id", "from_block_id", "to_block_id"}
 ROADMAP_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 EDITOR_ROLES = ("admin", "editor")
 PUBLIC_VISIBILITY_TAG = "public"
 SPECIAL_VISIBILITY_TAGS = {PUBLIC_VISIBILITY_TAG}
+VISIBLE_GROUP_MODE = "visible"
+TRANSPARENT_GROUP_MODE = "transparent"
 
 
 @app.on_event("startup")
@@ -491,6 +494,19 @@ def _slugify_for_import(raw: str) -> str:
     return base[:60] or "roadmap"
 
 
+def _normalize_block_title(title: str, kind: str) -> str:
+    normalized = (title or "").strip()
+    if kind != "group" and not normalized:
+        raise HTTPException(status_code=400, detail="Block title is required")
+    return normalized
+
+
+def _normalize_visibility_mode(kind: str, visibility_mode: str) -> str:
+    if kind == "group" and visibility_mode == TRANSPARENT_GROUP_MODE:
+        return TRANSPARENT_GROUP_MODE
+    return VISIBLE_GROUP_MODE
+
+
 def _next_available_slug(base_slug: str, reserved_slugs: set[str]) -> str:
     candidate = base_slug
     if candidate not in reserved_slugs:
@@ -535,7 +551,7 @@ def _validate_import_envelope(raw_payload: dict, source_name: str) -> RoadmapExp
         raise HTTPException(status_code=400, detail=f"{source_name}: invalid roadmap export payload") from exc
     if envelope.format != EXPORT_FORMAT:
         raise HTTPException(status_code=400, detail=f"{source_name}: unsupported export format '{envelope.format}'")
-    if envelope.version != EXPORT_VERSION:
+    if envelope.version not in SUPPORTED_IMPORT_VERSIONS:
         raise HTTPException(status_code=400, detail=f"{source_name}: unsupported export version '{envelope.version}'")
 
     roadmap = envelope.roadmap
@@ -551,7 +567,7 @@ def _validate_import_envelope(raw_payload: dict, source_name: str) -> RoadmapExp
         if block.ref in seen_refs:
             raise HTTPException(status_code=400, detail=f"{source_name}: duplicate block ref '{block.ref}'")
         seen_refs.add(block.ref)
-        if not block.title.strip():
+        if block.kind != "group" and not block.title.strip():
             raise HTTPException(status_code=400, detail=f"{source_name}: each block must have a title")
 
     for link in roadmap.links:
@@ -585,7 +601,7 @@ def _read_import_bundle(file_name: str, content_type: str, raw_bytes: bytes) -> 
             raise HTTPException(status_code=400, detail="manifest.json is invalid") from exc
         if manifest.format != EXPORT_FORMAT:
             raise HTTPException(status_code=400, detail=f"manifest.json: unsupported export format '{manifest.format}'")
-        if manifest.version != EXPORT_VERSION:
+        if manifest.version not in SUPPORTED_IMPORT_VERSIONS:
             raise HTTPException(status_code=400, detail=f"manifest.json: unsupported export version '{manifest.version}'")
         if not manifest.roadmaps:
             raise HTTPException(status_code=400, detail="manifest.json must list at least one roadmap file")
@@ -635,6 +651,7 @@ def _serialize_roadmap_export(
             height=block.height,
             node_style=block.node_style,
             kind=block.kind,
+            visibility_mode=block.visibility_mode,
             bg_color=block.bg_color,
             label_position=block.label_position,
             label_align=block.label_align,
@@ -837,10 +854,14 @@ def update_block_details(
     block = db.query(RoadmapBlock).filter(RoadmapBlock.id == block_id).first()
     if block is None:
         raise HTTPException(status_code=404, detail="Block not found")
+    normalized_title = _normalize_block_title(payload.title, payload.kind)
+    normalized_visibility_mode = _normalize_visibility_mode(payload.kind, payload.visibility_mode)
     for field in ("title", "short_description", "detailed_content", "level",
                   "estimated_duration", "node_style", "x", "y", "width", "height",
                   "kind", "bg_color", "label_position", "label_align"):
         setattr(block, field, getattr(payload, field))
+    block.title = normalized_title
+    block.visibility_mode = normalized_visibility_mode
     db.commit()
     db.refresh(block)
     return BlockOut.model_validate(block)
@@ -858,19 +879,21 @@ def create_block(
     ).first()
     if roadmap is None:
         raise HTTPException(status_code=404, detail="Roadmap not found")
+    normalized_title = _normalize_block_title(payload.title, payload.kind)
+    normalized_visibility_mode = _normalize_visibility_mode(payload.kind, payload.visibility_mode)
     max_order = db.query(func.max(RoadmapBlock.order_index)).filter(
         RoadmapBlock.roadmap_id == roadmap.id
     ).scalar()
     block = RoadmapBlock(
         roadmap_id=roadmap.id,
-        title=payload.title,
+        title=normalized_title,
         short_description=payload.short_description,
         detailed_content=payload.detailed_content,
         level=payload.level,
         estimated_duration=payload.estimated_duration,
         node_style=payload.node_style,
         x=payload.x, y=payload.y, width=payload.width, height=payload.height,
-        kind=payload.kind, bg_color=payload.bg_color,
+        kind=payload.kind, visibility_mode=normalized_visibility_mode, bg_color=payload.bg_color,
         label_position=payload.label_position, label_align=payload.label_align,
         order_index=(max_order or 0) + 1,
     )
@@ -1190,9 +1213,10 @@ async def import_roadmaps(
 
             block_id_by_ref = {}
             for block in sorted(roadmap.blocks, key=lambda entry: (entry.order_index, entry.ref)):
+                normalized_title = _normalize_block_title(block.title, block.kind)
                 imported_block = RoadmapBlock(
                     roadmap_id=imported.id,
-                    title=block.title.strip(),
+                    title=normalized_title,
                     short_description=block.short_description,
                     detailed_content=block.detailed_content,
                     level=block.level,
@@ -1204,6 +1228,7 @@ async def import_roadmaps(
                     height=block.height,
                     node_style=block.node_style,
                     kind=block.kind,
+                    visibility_mode=_normalize_visibility_mode(block.kind, block.visibility_mode),
                     bg_color=block.bg_color,
                     label_position=block.label_position,
                     label_align=block.label_align,

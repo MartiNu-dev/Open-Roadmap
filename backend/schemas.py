@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 Role = Literal["admin", "editor", "user"]
 ProgressStatus = Literal["not_started", "in_progress", "completed"]
+VisibilityMode = Literal["visible", "transparent"]
 
 
 # ---------- Auth ----------
@@ -129,6 +130,7 @@ class BlockOut(BaseModel):
     height: int
     node_style: str
     kind: str = "block"
+    visibility_mode: str = "visible"
     bg_color: str = "#0f172a"
     label_position: str = "bottom"
     label_align: str = "center"
@@ -157,7 +159,7 @@ class BlockPositionIn(BaseModel):
 
 
 class BlockUpsertIn(BaseModel):
-    title: str = Field(min_length=1, max_length=120)
+    title: str = Field(default="", max_length=120)
     short_description: str = ""
     detailed_content: str = ""
     level: str = ""
@@ -168,6 +170,7 @@ class BlockUpsertIn(BaseModel):
     width: int = 220
     height: int = 44
     kind: Literal["block", "group"] = "block"
+    visibility_mode: VisibilityMode = "visible"
     bg_color: str = "#0f172a"
     label_position: Literal["top", "bottom"] = "bottom"
     label_align: Literal["left", "center", "right"] = "center"
@@ -300,6 +303,7 @@ class RoadmapExportBlock(BaseModel):
     height: int
     node_style: str
     kind: str = "block"
+    visibility_mode: VisibilityMode = "visible"
     bg_color: str = "#0f172a"
     label_position: str = "bottom"
     label_align: str = "center"

@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Loader2, Plus, Square } from "lucide-react";
+import { Check, Ghost, Loader2, Plus, Square } from "lucide-react";
 import { getLevelLabel } from "@/i18n/formatters";
 
 const NODE_STYLES = {
@@ -50,28 +50,48 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
   const align = block.label_align || "center";
   const alignCls = align === "left" ? "text-left" : align === "right" ? "text-right" : "text-center";
   const labelStyle = { color: "#fff" };
+  const isTransparent = block.visibility_mode === "transparent";
+  const isEditInteractive = isEditor && editMode;
+  const isInteractive = !isTransparent || isEditInteractive;
+  const showTransparentChrome = isTransparent && isEditInteractive;
+  const showLabel = block.title && (!isTransparent || showTransparentChrome);
+  const labelClassName = `px-3 py-1 text-xs font-mono uppercase tracking-wider ${alignCls}`;
 
   return (
     <div
       data-block-id={block.id}
       data-block-kind="group"
       data-testid={`canvas-group-${block.id}`}
-      className={`absolute select-none group ${editMode && isEditor ? "cursor-move" : "cursor-pointer"}`}
+      className={`absolute select-none group ${isEditInteractive ? "cursor-move" : isInteractive ? "cursor-pointer" : "pointer-events-none"}`}
       style={{ left: block.x, top: block.y, width: block.width, height: block.height, zIndex: 0 }}
-      onMouseDown={(e) => onMouseDownGroup(e, block)}
-      onClick={() => { if (!suppressClickRef.current) onClick?.(block); }}
-      onContextMenu={(e) => { e.preventDefault(); if (!suppressClickRef.current) onClick?.(block); }}
+      onMouseDown={isEditInteractive ? (e) => onMouseDownGroup(e, block) : undefined}
+      onClick={isInteractive ? () => { if (!suppressClickRef.current) onClick?.(block); } : undefined}
+      onContextMenu={isInteractive ? (e) => { e.preventDefault(); if (!suppressClickRef.current) onClick?.(block); } : undefined}
     >
-      <div className="relative w-full h-full rounded-md flex flex-col" style={{ background: block.bg_color || "#0f172a" }}>
-        {block.title && labelTop && (
-          <div className={`px-3 py-1 text-xs font-mono uppercase tracking-wider ${alignCls}`} style={labelStyle}>{block.title}</div>
-        )}
-        <div className="flex-1" />
-        {block.title && !labelTop && (
-          <div className={`px-3 py-1 text-xs font-mono uppercase tracking-wider ${alignCls}`} style={labelStyle}>{block.title}</div>
-        )}
-      </div>
-      {isEditor && editMode && (
+      {showTransparentChrome ? (
+        <div className="relative flex h-full w-full flex-col rounded-md border border-dashed border-slate-300 bg-white/40">
+          {showLabel && labelTop && (
+            <div className={labelClassName} style={{ color: "#475569" }} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
+          )}
+          <div className="flex flex-1 items-center justify-center">
+            <Ghost size={22} className="text-slate-400" data-testid={`canvas-group-ghost-${block.id}`} />
+          </div>
+          {showLabel && !labelTop && (
+            <div className={labelClassName} style={{ color: "#475569" }} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
+          )}
+        </div>
+      ) : isTransparent ? null : (
+        <div className="relative w-full h-full rounded-md flex flex-col" style={{ background: block.bg_color || "#0f172a" }}>
+          {showLabel && labelTop && (
+            <div className={labelClassName} style={labelStyle}>{block.title}</div>
+          )}
+          <div className="flex-1" />
+          {showLabel && !labelTop && (
+            <div className={labelClassName} style={labelStyle}>{block.title}</div>
+          )}
+        </div>
+      )}
+      {isEditInteractive && (
         <>
           {["top", "right", "bottom", "left"].map((side) => {
             const pos = {

@@ -123,6 +123,7 @@ class RoadmapBlock(Base):
     node_style = Column(String, nullable=False, default="primary")  # primary | alternative | optional | label
     # Object kind + group-only visual props
     kind = Column(String, nullable=False, default="block")          # block | group
+    visibility_mode = Column(String, nullable=False, default="visible")  # visible | transparent (groups only)
     bg_color = Column(String, nullable=False, default="#0f172a")    # group background (slate-900 by default)
     label_position = Column(String, nullable=False, default="bottom")  # top | bottom
     label_align = Column(String, nullable=False, default="center")     # left | center | right

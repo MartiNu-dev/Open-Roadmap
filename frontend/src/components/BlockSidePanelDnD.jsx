@@ -25,6 +25,7 @@ const LEVEL_OPTIONS = ["", "beginner", "intermediate", "advanced"];
 const GROUP_BG_PRESETS = ["#0f172a", "#1e293b", "#334155", "#1e3a8a", "#065f46", "#7c2d12", "#581c87", "#9f1239"];
 const POSITIONS = ["top", "bottom"];
 const ALIGNS = ["left", "center", "right"];
+const VISIBILITY_MODES = ["visible", "transparent"];
 
 function sortResources(resources = []) {
   return [...resources].sort((a, b) =>
@@ -172,6 +173,7 @@ export default function BlockSidePanelDnD({
         level: block.level || "",
         estimated_duration: block.estimated_duration || "",
         node_style: block.node_style || "primary",
+        visibility_mode: block.visibility_mode || "visible",
         bg_color: block.bg_color || "#0f172a",
         label_position: block.label_position || "bottom",
         label_align: block.label_align || "center",
@@ -193,6 +195,7 @@ export default function BlockSidePanelDnD({
       || (form.level !== (block.level || ""))
       || (form.estimated_duration !== (block.estimated_duration || ""))
       || (form.node_style !== (block.node_style || "primary"))
+      || (form.visibility_mode !== (block.visibility_mode || "visible"))
       || (form.bg_color !== (block.bg_color || "#0f172a"))
       || (form.label_position !== (block.label_position || "bottom"))
       || (form.label_align !== (block.label_align || "center"));
@@ -200,14 +203,14 @@ export default function BlockSidePanelDnD({
 
     const isGroup = block.kind === "group";
     if (!isGroup && (!form.title || !form.title.trim())) return;
-    const safeTitle = isGroup ? (form.title || "Group") : form.title;
-    const timeoutId = setTimeout(() => onSave?.({ ...form, title: safeTitle }), 500);
+    const timeoutId = setTimeout(() => onSave?.(form), 500);
     return () => clearTimeout(timeoutId);
   }, [form, canManage, block, onSave]);
 
   if (!block || !form) return null;
 
   const isTrackableBlock = block.kind === "block";
+  const panelTitle = block.title || (block.kind === "group" ? t("blockPanel.untitledGroup") : "");
   const status = progress?.status || "not_started";
   const resources = sortResources(block.resources || []);
   const canReorderResources = canManage && resources.length > 1 && typeof onReorderResources === "function";
@@ -269,7 +272,7 @@ export default function BlockSidePanelDnD({
                 }>{getProgressStatusLabel(t, status)}</span>
               )}
             </div>
-            <SheetTitle className="font-display text-2xl text-left text-slate-900">{block.title}</SheetTitle>
+            <SheetTitle className="font-display text-2xl text-left text-slate-900">{panelTitle}</SheetTitle>
             {block.short_description && (
               <SheetDescription className="text-left text-slate-600">{block.short_description}</SheetDescription>
             )}
@@ -283,6 +286,15 @@ export default function BlockSidePanelDnD({
                 <div>
                   <Label>{t("blockPanel.labelOptional")}</Label>
                   <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-group-title" />
+                </div>
+                <div>
+                  <Label>{t("blockPanel.visibility")}</Label>
+                  <select className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                    value={form.visibility_mode}
+                    onChange={(e) => setField("visibility_mode", e.target.value)}
+                    data-testid="edit-group-visibility-mode">
+                    {VISIBILITY_MODES.map((mode) => <option key={mode} value={mode}>{t(`blockPanel.visibilityModes.${mode}`)}</option>)}
+                  </select>
                 </div>
                 <div>
                   <Label>{t("blockPanel.backgroundColor")}</Label>

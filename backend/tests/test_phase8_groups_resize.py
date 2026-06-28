@@ -8,6 +8,7 @@ import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
+REQUEST_TIMEOUT_SECONDS = float(os.environ.get("TEST_REQUEST_TIMEOUT_SECONDS", "12"))
 
 ADMIN = {
     "email": os.environ.get("ADMIN_EMAIL", "admin@example.com"),
@@ -25,7 +26,7 @@ USER = {
 
 def _login(creds):
     s = requests.Session()
-    r = s.post(f"{API}/auth/login", json=creds)
+    r = s.post(f"{API}/auth/login", json=creds, timeout=REQUEST_TIMEOUT_SECONDS)
     assert r.status_code == 200, r.text
     return s
 
@@ -36,7 +37,7 @@ def _csrf_headers(session):
 
 def _frontend_id(session=None):
     sess = session or requests
-    r = sess.get(f"{API}/roadmaps/frontend")
+    r = sess.get(f"{API}/roadmaps/frontend", timeout=REQUEST_TIMEOUT_SECONDS)
     assert r.status_code == 200
     return r.json()["id"], r.json()
 
@@ -50,6 +51,7 @@ class TestBlockOutShape:
         assert data["blocks"], "no blocks"
         for b in data["blocks"]:
             assert b.get("kind") in ("block", "group")
+            assert b.get("visibility_mode") in ("visible", "transparent")
             assert "bg_color" in b and isinstance(b["bg_color"], str) and b["bg_color"].startswith("#")
             assert b.get("label_position") in ("top", "bottom")
             assert b.get("label_align") in ("left", "center", "right")
@@ -65,6 +67,7 @@ class TestCreateGroup:
             payload = {
                 "title": "TEST_group_phase8",
                 "kind": "group",
+                "visibility_mode": "transparent",
                 "bg_color": "#1e3a8a",
                 "label_position": "top",
                 "label_align": "left",
@@ -77,6 +80,7 @@ class TestCreateGroup:
             body = r.json()
             created_ids.append(body["id"])
             assert body["kind"] == "group"
+            assert body["visibility_mode"] == "transparent"
             assert body["bg_color"] == "#1e3a8a"
             assert body["label_position"] == "top"
             assert body["label_align"] == "left"
@@ -90,6 +94,7 @@ class TestCreateGroup:
             assert match, "group not persisted"
             m = match[0]
             assert m["kind"] == "group"
+            assert m["visibility_mode"] == "transparent"
             assert m["bg_color"] == "#1e3a8a"
             assert m["label_position"] == "top"
             assert m["label_align"] == "left"
@@ -138,6 +143,7 @@ class TestPutUpdatesGroupFields:
             put_payload = {
                 "title": "TEST_put_phase8_renamed",
                 "kind": "group",
+                "visibility_mode": "transparent",
                 "bg_color": "#7c3aed",
                 "label_position": "top",
                 "label_align": "right",
@@ -146,6 +152,7 @@ class TestPutUpdatesGroupFields:
             r2 = s.put(f"{API}/blocks/{bid}", json=put_payload, headers=_csrf_headers(s))
             assert r2.status_code == 200, r2.text
             o = r2.json()
+            assert o["visibility_mode"] == "transparent"
             assert o["bg_color"] == "#7c3aed"
             assert o["label_position"] == "top"
             assert o["label_align"] == "right"
@@ -154,11 +161,38 @@ class TestPutUpdatesGroupFields:
             # Verify persistence
             d = s.get(f"{API}/roadmaps/frontend").json()
             m = next(b for b in d["blocks"] if b["id"] == bid)
+            assert m["visibility_mode"] == "transparent"
             assert m["bg_color"] == "#7c3aed"
             assert m["label_align"] == "right"
         finally:
             for bid in created_ids:
                 s.delete(f"{API}/blocks/{bid}", headers=_csrf_headers(s))
+
+
+class TestVisibilityModeNormalization:
+    def test_non_group_cannot_persist_transparent_visibility(self):
+        s = _login(EDITOR)
+        rid, _ = _frontend_id(s)
+        created_ids = []
+        try:
+            r = s.post(
+                f"{API}/roadmaps/{rid}/blocks",
+                json={"title": "TEST_visibility_norm_phase8", "visibility_mode": "transparent"},
+                headers=_csrf_headers(s),
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            assert r.status_code == 201, r.text
+            body = r.json()
+            created_ids.append(body["id"])
+            assert body["kind"] == "block"
+            assert body["visibility_mode"] == "visible"
+
+            d = s.get(f"{API}/roadmaps/frontend", timeout=REQUEST_TIMEOUT_SECONDS).json()
+            m = next(b for b in d["blocks"] if b["id"] == body["id"])
+            assert m["visibility_mode"] == "visible"
+        finally:
+            for bid in created_ids:
+                s.delete(f"{API}/blocks/{bid}", headers=_csrf_headers(s), timeout=REQUEST_TIMEOUT_SECONDS)
 
 
 # --------- PATCH position accepts width/height ---------

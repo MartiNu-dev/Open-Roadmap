@@ -110,6 +110,12 @@
       "right": "Right"
     },
     "labelOptional": "Label (optional)",
+    "untitledGroup": "Untitled group",
+    "visibility": "Visibility",
+    "visibilityModes": {
+      "visible": "Visible",
+      "transparent": "Transparent"
+    },
     "backgroundColor": "Background color",
     "labelPosition": "Label position",
     "textAlignment": "Text alignment",

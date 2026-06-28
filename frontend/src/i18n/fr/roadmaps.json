@@ -110,6 +110,12 @@
       "right": "Droite"
     },
     "labelOptional": "Libellé (optionnel)",
+    "untitledGroup": "Groupe sans nom",
+    "visibility": "Visibilité",
+    "visibilityModes": {
+      "visible": "Visible",
+      "transparent": "Transparent"
+    },
     "backgroundColor": "Couleur de fond",
     "labelPosition": "Position du libellé",
     "textAlignment": "Alignement du texte",
