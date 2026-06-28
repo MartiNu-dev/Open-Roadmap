@@ -121,8 +121,8 @@ class RoadmapBlock(Base):
     width = Column(Integer, nullable=False, default=220)
     height = Column(Integer, nullable=False, default=44)
     node_style = Column(String, nullable=False, default="primary")  # primary | alternative | optional | label
-    # Object kind + group-only visual props
-    kind = Column(String, nullable=False, default="block")          # block | group
+    # Object kind + group/checkbox visual props
+    kind = Column(String, nullable=False, default="block")          # block | group | checkbox
     visibility_mode = Column(String, nullable=False, default="visible")  # visible | transparent (groups only)
     bg_color = Column(String, nullable=False, default="#0f172a")    # group background (slate-900 by default)
     border_color = Column(String, nullable=False, default="#94a3b8")  # group border (slate-400 by default)
@@ -130,6 +130,10 @@ class RoadmapBlock(Base):
     border_thickness = Column(String, nullable=False, default="small")  # small | medium | large
     label_position = Column(String, nullable=False, default="bottom")  # top | bottom
     label_align = Column(String, nullable=False, default="center")     # left | center | right
+    checkbox_color = Column(String, nullable=False, default="#111827")
+    text_color = Column(String, nullable=False, default="#0f172a")
+    font_size = Column(String, nullable=False, default="base")         # xs | sm | base | lg | xl
+    label_side = Column(String, nullable=False, default="right")       # left | right
 
     roadmap = relationship("Roadmap", back_populates="blocks")
     resources = relationship(

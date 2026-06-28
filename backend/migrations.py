@@ -57,6 +57,10 @@ def run_migrations(engine: Engine) -> None:
         "border_thickness": "VARCHAR NOT NULL DEFAULT 'small'",
         "label_position": "VARCHAR NOT NULL DEFAULT 'bottom'",
         "label_align": "VARCHAR NOT NULL DEFAULT 'center'",
+        "checkbox_color": "VARCHAR NOT NULL DEFAULT '#111827'",
+        "text_color": "VARCHAR NOT NULL DEFAULT '#0f172a'",
+        "font_size": "VARCHAR NOT NULL DEFAULT 'base'",
+        "label_side": "VARCHAR NOT NULL DEFAULT 'right'",
     }
     link_cols = {c["name"] for c in insp.get_columns("roadmap_links")} if "roadmap_links" in insp.get_table_names() else set()
     link_needed = {

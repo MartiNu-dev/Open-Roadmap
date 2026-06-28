@@ -1,10 +1,20 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 
+jest.mock("react-markdown", () => ({
+  __esModule: true,
+  default: ({ children }) => <div>{children}</div>,
+}));
+jest.mock("remark-gfm", () => ({
+  __esModule: true,
+  default: {},
+}));
+
 import BlockSidePanelDnD from "./BlockSidePanelDnD";
 import { createConfiguredI18n } from "../i18n";
 
 function renderPanel(props = {}) {
+  const { block: blockOverrides = {}, ...restProps } = props;
   const i18n = createConfiguredI18n({ lng: "en" });
   const block = {
     id: "group-1",
@@ -29,6 +39,11 @@ function renderPanel(props = {}) {
     label_position: "top",
     label_align: "center",
     resources: [],
+    checkbox_color: "#111827",
+    text_color: "#0f172a",
+    font_size: "base",
+    label_side: "right",
+    ...blockOverrides,
   };
   const onSave = jest.fn();
 
@@ -49,7 +64,7 @@ function renderPanel(props = {}) {
         onUpdateResource={() => {}}
         onDeleteResource={() => {}}
         onReorderResources={() => {}}
-        {...props}
+        {...restProps}
       />
     </I18nextProvider>
   );
@@ -86,6 +101,52 @@ describe("BlockSidePanelDnD group borders", () => {
       border_style: "dotted",
       border_thickness: "large",
       border_color: "#ef4444",
+    }));
+  });
+});
+
+describe("BlockSidePanelDnD checkbox editor", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
+  it("renders checkbox controls and autosaves checkbox changes", () => {
+    const { onSave } = renderPanel({
+      block: {
+        id: "checkbox-1",
+        title: "Checkbox node",
+        kind: "checkbox",
+      },
+    });
+
+    expect(screen.getByTestId("checkbox-editor-form")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-checkbox-title")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-checkbox-color")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-checkbox-text-color")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-checkbox-font-size")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-checkbox-label-side")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("edit-checkbox-title"), { target: { value: "Checkbox updated" } });
+    fireEvent.change(screen.getByTestId("edit-checkbox-color"), { target: { value: "#ef4444" } });
+    fireEvent.change(screen.getByTestId("edit-checkbox-text-color"), { target: { value: "#2563eb" } });
+    fireEvent.change(screen.getByTestId("edit-checkbox-font-size"), { target: { value: "xl" } });
+    fireEvent.change(screen.getByTestId("edit-checkbox-label-side"), { target: { value: "left" } });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Checkbox updated",
+      checkbox_color: "#ef4444",
+      text_color: "#2563eb",
+      font_size: "xl",
+      label_side: "left",
     }));
   });
 });

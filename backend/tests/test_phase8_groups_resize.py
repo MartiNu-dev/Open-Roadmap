@@ -50,7 +50,7 @@ class TestBlockOutShape:
         data = r.json()
         assert data["blocks"], "no blocks"
         for b in data["blocks"]:
-            assert b.get("kind") in ("block", "group")
+            assert b.get("kind") in ("block", "group", "checkbox")
             assert b.get("visibility_mode") in ("visible", "transparent")
             assert "bg_color" in b and isinstance(b["bg_color"], str) and b["bg_color"].startswith("#")
             assert "border_color" in b and isinstance(b["border_color"], str) and b["border_color"].startswith("#")
@@ -58,6 +58,10 @@ class TestBlockOutShape:
             assert b.get("border_thickness") in ("small", "medium", "large")
             assert b.get("label_position") in ("top", "bottom")
             assert b.get("label_align") in ("left", "center", "right")
+            assert "checkbox_color" in b and isinstance(b["checkbox_color"], str) and b["checkbox_color"].startswith("#")
+            assert "text_color" in b and isinstance(b["text_color"], str) and b["text_color"].startswith("#")
+            assert b.get("font_size") in ("xs", "sm", "base", "lg", "xl")
+            assert b.get("label_side") in ("left", "right")
 
 
 # --------- Create group ---------

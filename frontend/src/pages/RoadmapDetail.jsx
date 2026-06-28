@@ -101,7 +101,7 @@ export default function RoadmapDetail() {
 
   const progressBlockIds = useMemo(() => new Set(
     (roadmap?.blocks || [])
-      .filter((block) => block.kind === "block")
+      .filter((block) => block.kind === "block" || block.kind === "checkbox")
       .map((block) => block.id)
   ), [roadmap?.blocks]);
 
@@ -111,19 +111,36 @@ export default function RoadmapDetail() {
   const percent = total ? Math.round((completed / total) * 100) : 0;
 
   const selectedBlock = roadmap?.blocks.find((block) => block.id === selectedBlockId) || null;
-  const selectedProgress = selectedBlockId && selectedBlock?.kind === "block" ? progressByBlock[selectedBlockId] : null;
+  const selectedProgress = selectedBlockId && (selectedBlock?.kind === "block" || selectedBlock?.kind === "checkbox") ? progressByBlock[selectedBlockId] : null;
 
   const openBlock = (block) => {
+    if (block.kind === "checkbox" && !(isEditor && editMode)) return;
     setSelectedBlockId(block.id);
     setPanelOpen(true);
   };
 
   const handleStatusChange = async (status) => {
-    if (!user || !selectedBlock || !roadmap || selectedBlock.kind !== "block") return;
+    if (!user || !selectedBlock || !roadmap || (selectedBlock.kind !== "block" && selectedBlock.kind !== "checkbox")) return;
     const { data } = await api.post("/progress", {
       roadmap_id: roadmap.id, block_id: selectedBlock.id, status,
     });
     setProgressItems((prev) => [...prev.filter((item) => item.block_id !== data.block_id), data]);
+  };
+
+  const handleToggleCheckbox = async (block) => {
+    if (!user || !roadmap || block.kind !== "checkbox") return;
+    try {
+      const currentStatus = progressByBlock[block.id]?.status || "not_started";
+      const nextStatus = currentStatus === "completed" ? "not_started" : "completed";
+      const { data } = await api.post("/progress", {
+        roadmap_id: roadmap.id,
+        block_id: block.id,
+        status: nextStatus,
+      });
+      setProgressItems((prev) => [...prev.filter((item) => item.block_id !== data.block_id), data]);
+    } catch (e) {
+      alert(formatApiError(e, t("common:errors.generic")));
+    }
   };
 
   const handleMoveBlock = async (blockId, x, y) => {
@@ -181,6 +198,31 @@ export default function RoadmapDetail() {
         kind: "group", visibility_mode: "visible", bg_color: "#0f172a", label_position: "bottom", label_align: "center",
         border_color: "#94a3b8", border_style: "solid", border_thickness: "small",
         x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), width: 360, height: 200,
+      });
+      setRoadmap((current) => ({ ...current, blocks: [...current.blocks, data] }));
+    } catch (e) {
+      alert(formatApiError(e, t("common:errors.generic")));
+    }
+  };
+
+  const handleAddCheckboxAt = async (x, y) => {
+    try {
+      const { data } = await api.post(`/roadmaps/${roadmap.id}/blocks`, {
+        title: "Checkbox",
+        short_description: "",
+        detailed_content: "",
+        level: "",
+        estimated_duration: "",
+        node_style: "primary",
+        kind: "checkbox",
+        checkbox_color: "#111827",
+        text_color: "#0f172a",
+        font_size: "base",
+        label_side: "right",
+        x: Math.max(0, Math.round(x)),
+        y: Math.max(0, Math.round(y)),
+        width: 320,
+        height: 44,
       });
       setRoadmap((current) => ({ ...current, blocks: [...current.blocks, data] }));
     } catch (e) {
@@ -430,7 +472,9 @@ export default function RoadmapDetail() {
           onSelectLink={handleSelectLink}
           onAddBlockAt={handleAddBlockAt}
           onAddGroupAt={handleAddGroupAt}
+          onAddCheckboxAt={handleAddCheckboxAt}
           onResizeBlock={handleResizeBlock}
+          onToggleCheckbox={handleToggleCheckbox}
         />
       </div>
 

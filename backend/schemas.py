@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 Role = Literal["admin", "editor", "user"]
 ProgressStatus = Literal["not_started", "in_progress", "completed"]
 VisibilityMode = Literal["visible", "transparent"]
+BlockKind = Literal["block", "group", "checkbox"]
+CheckboxFontSize = Literal["xs", "sm", "base", "lg", "xl"]
+LabelSide = Literal["left", "right"]
 
 
 # ---------- Auth ----------
@@ -129,7 +132,7 @@ class BlockOut(BaseModel):
     width: int
     height: int
     node_style: str
-    kind: str = "block"
+    kind: BlockKind = "block"
     visibility_mode: str = "visible"
     bg_color: str = "#0f172a"
     border_color: str = "#94a3b8"
@@ -137,6 +140,10 @@ class BlockOut(BaseModel):
     border_thickness: str = "small"
     label_position: str = "bottom"
     label_align: str = "center"
+    checkbox_color: str = "#111827"
+    text_color: str = "#0f172a"
+    font_size: CheckboxFontSize = "base"
+    label_side: LabelSide = "right"
     resources: List[ResourceOut] = []
 
 
@@ -172,7 +179,7 @@ class BlockUpsertIn(BaseModel):
     y: int = 0
     width: int = 220
     height: int = 44
-    kind: Literal["block", "group"] = "block"
+    kind: BlockKind = "block"
     visibility_mode: VisibilityMode = "visible"
     bg_color: str = "#0f172a"
     border_color: str = "#94a3b8"
@@ -180,6 +187,10 @@ class BlockUpsertIn(BaseModel):
     border_thickness: Literal["small", "medium", "large"] = "small"
     label_position: Literal["top", "bottom"] = "bottom"
     label_align: Literal["left", "center", "right"] = "center"
+    checkbox_color: str = "#111827"
+    text_color: str = "#0f172a"
+    font_size: CheckboxFontSize = "base"
+    label_side: LabelSide = "right"
 
 
 class LinkCreateIn(BaseModel):
@@ -308,7 +319,7 @@ class RoadmapExportBlock(BaseModel):
     width: int
     height: int
     node_style: str
-    kind: str = "block"
+    kind: BlockKind = "block"
     visibility_mode: VisibilityMode = "visible"
     bg_color: str = "#0f172a"
     border_color: str = "#94a3b8"
@@ -316,6 +327,10 @@ class RoadmapExportBlock(BaseModel):
     border_thickness: Literal["small", "medium", "large"] = "small"
     label_position: str = "bottom"
     label_align: str = "center"
+    checkbox_color: str = "#111827"
+    text_color: str = "#0f172a"
+    font_size: CheckboxFontSize = "base"
+    label_side: LabelSide = "right"
     resources: List[RoadmapExportResource] = []
 
 

@@ -29,6 +29,8 @@ const ALIGNS = ["left", "center", "right"];
 const VISIBILITY_MODES = ["visible", "transparent"];
 const BORDER_STYLES = ["solid", "dashed", "dotted"];
 const BORDER_THICKNESSES = ["small", "medium", "large"];
+const FONT_SIZE_OPTIONS = ["xs", "sm", "base", "lg", "xl"];
+const LABEL_SIDES = ["left", "right"];
 
 function sortResources(resources = []) {
   return [...resources].sort((a, b) =>
@@ -183,6 +185,10 @@ export default function BlockSidePanelDnD({
         border_thickness: block.border_thickness || "small",
         label_position: block.label_position || "bottom",
         label_align: block.label_align || "center",
+        checkbox_color: block.checkbox_color || "#111827",
+        text_color: block.text_color || "#0f172a",
+        font_size: block.font_size || "base",
+        label_side: block.label_side || "right",
       });
     }
   }, [block?.id]);
@@ -207,7 +213,11 @@ export default function BlockSidePanelDnD({
       || (form.border_style !== (block.border_style || "solid"))
       || (form.border_thickness !== (block.border_thickness || "small"))
       || (form.label_position !== (block.label_position || "bottom"))
-      || (form.label_align !== (block.label_align || "center"));
+      || (form.label_align !== (block.label_align || "center"))
+      || (form.checkbox_color !== (block.checkbox_color || "#111827"))
+      || (form.text_color !== (block.text_color || "#0f172a"))
+      || (form.font_size !== (block.font_size || "base"))
+      || (form.label_side !== (block.label_side || "right"));
     if (!changed) return;
 
     const isGroup = block.kind === "group";
@@ -218,7 +228,8 @@ export default function BlockSidePanelDnD({
 
   if (!block || !form) return null;
 
-  const isTrackableBlock = block.kind === "block";
+  const isTrackableBlock = block.kind === "block" || block.kind === "checkbox";
+  const isCheckbox = block.kind === "checkbox";
   const panelTitle = block.title || (block.kind === "group" ? t("blockPanel.untitledGroup") : "");
   const status = progress?.status || "not_started";
   const resources = sortResources(block.resources || []);
@@ -409,6 +420,69 @@ export default function BlockSidePanelDnD({
                   <span className="text-xs text-slate-500 italic">{saving ? t("blockPanel.saving") : t("blockPanel.autoSaves")}</span>
                   <Button variant="outline" onClick={onDelete} data-testid="edit-group-delete-btn" className="ml-auto">
                     <Trash2 size={14} className="mr-1 text-red-600" /> {t("blockPanel.deleteGroup")}
+                  </Button>
+                </div>
+              </div>
+            ) : isCheckbox ? (
+              <div className="space-y-4" data-testid="checkbox-editor-form">
+                <div>
+                  <Label>{t("blockPanel.checkboxText")}</Label>
+                  <Input value={form.title} onChange={(e) => setField("title", e.target.value)} data-testid="edit-checkbox-title" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("blockPanel.checkboxColor")}</Label>
+                    <input
+                      type="color"
+                      value={form.checkbox_color}
+                      onChange={(e) => setField("checkbox_color", e.target.value)}
+                      className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white p-1 cursor-pointer"
+                      data-testid="edit-checkbox-color"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("blockPanel.textColor")}</Label>
+                    <input
+                      type="color"
+                      value={form.text_color}
+                      onChange={(e) => setField("text_color", e.target.value)}
+                      className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white p-1 cursor-pointer"
+                      data-testid="edit-checkbox-text-color"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("blockPanel.fontSize")}</Label>
+                    <select
+                      className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                      value={form.font_size}
+                      onChange={(e) => setField("font_size", e.target.value)}
+                      data-testid="edit-checkbox-font-size"
+                    >
+                      {FONT_SIZE_OPTIONS.map((fontSize) => (
+                        <option key={fontSize} value={fontSize}>{t(`blockPanel.fontSizes.${fontSize}`)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>{t("blockPanel.labelSide")}</Label>
+                    <select
+                      className="w-full h-10 border border-slate-200 rounded-md px-2 text-sm bg-white"
+                      value={form.label_side}
+                      onChange={(e) => setField("label_side", e.target.value)}
+                      data-testid="edit-checkbox-label-side"
+                    >
+                      {LABEL_SIDES.map((side) => (
+                        <option key={side} value={side}>{getPositionLabel(t, side)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2 items-center">
+                  <span className="text-xs text-slate-500 italic">{saving ? t("blockPanel.saving") : t("blockPanel.autoSaves")}</span>
+                  <Button variant="outline" onClick={onDelete} data-testid="edit-checkbox-delete-btn" className="ml-auto">
+                    <Trash2 size={14} className="mr-1 text-red-600" /> {t("blockPanel.deleteCheckbox")}
                   </Button>
                 </div>
               </div>

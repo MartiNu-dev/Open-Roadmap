@@ -111,6 +111,8 @@ PUBLIC_VISIBILITY_TAG = "public"
 SPECIAL_VISIBILITY_TAGS = {PUBLIC_VISIBILITY_TAG}
 VISIBLE_GROUP_MODE = "visible"
 TRANSPARENT_GROUP_MODE = "transparent"
+TRACKABLE_BLOCK_KINDS = ("block", "checkbox")
+LINKABLE_BLOCK_KINDS = ("block", "group")
 
 
 @app.on_event("startup")
@@ -507,6 +509,11 @@ def _normalize_visibility_mode(kind: str, visibility_mode: str) -> str:
     return VISIBLE_GROUP_MODE
 
 
+def _assert_linkable_block(block: RoadmapBlock, *, detail: str) -> None:
+    if block.kind not in LINKABLE_BLOCK_KINDS:
+        raise HTTPException(status_code=400, detail=detail)
+
+
 def _next_available_slug(base_slug: str, reserved_slugs: set[str]) -> str:
     candidate = base_slug
     if candidate not in reserved_slugs:
@@ -563,10 +570,12 @@ def _validate_import_envelope(raw_payload: dict, source_name: str) -> RoadmapExp
         raise HTTPException(status_code=400, detail=f"{source_name}: roadmap must contain at least one block")
 
     seen_refs = set()
+    block_kind_by_ref = {}
     for block in roadmap.blocks:
         if block.ref in seen_refs:
             raise HTTPException(status_code=400, detail=f"{source_name}: duplicate block ref '{block.ref}'")
         seen_refs.add(block.ref)
+        block_kind_by_ref[block.ref] = block.kind
         if block.kind != "group" and not block.title.strip():
             raise HTTPException(status_code=400, detail=f"{source_name}: each block must have a title")
 
@@ -575,6 +584,8 @@ def _validate_import_envelope(raw_payload: dict, source_name: str) -> RoadmapExp
             raise HTTPException(status_code=400, detail=f"{source_name}: link references unknown from_ref '{link.from_ref}'")
         if link.to_ref not in seen_refs:
             raise HTTPException(status_code=400, detail=f"{source_name}: link references unknown to_ref '{link.to_ref}'")
+        if block_kind_by_ref.get(link.from_ref) == "checkbox" or block_kind_by_ref.get(link.to_ref) == "checkbox":
+            raise HTTPException(status_code=400, detail=f"{source_name}: checkbox blocks cannot be linked")
     return envelope
 
 
@@ -658,6 +669,10 @@ def _serialize_roadmap_export(
             border_thickness=block.border_thickness,
             label_position=block.label_position,
             label_align=block.label_align,
+            checkbox_color=block.checkbox_color,
+            text_color=block.text_color,
+            font_size=block.font_size,
+            label_side=block.label_side,
             resources=[
                 RoadmapExportResource(
                     label=res.label,
@@ -695,6 +710,13 @@ def _serialize_roadmap_export(
                     "to_block_id": link.to_block_id,
                 },
             )
+            continue
+        if (
+            any(block.ref == from_ref and block.kind == "checkbox" for block in export_blocks)
+            or any(block.ref == to_ref and block.kind == "checkbox" for block in export_blocks)
+        ):
+            skipped_links += 1
+            logger.warning("Skipping checkbox link during export for roadmap %s", roadmap.slug)
             continue
         export_links.append(RoadmapExportLink(
             from_ref=from_ref,
@@ -862,7 +884,8 @@ def update_block_details(
     for field in ("title", "short_description", "detailed_content", "level",
                   "estimated_duration", "node_style", "x", "y", "width", "height",
                   "kind", "bg_color", "border_color", "border_style", "border_thickness",
-                  "label_position", "label_align"):
+                  "label_position", "label_align", "checkbox_color", "text_color",
+                  "font_size", "label_side"):
         setattr(block, field, getattr(payload, field))
     block.title = normalized_title
     block.visibility_mode = normalized_visibility_mode
@@ -900,6 +923,8 @@ def create_block(
         kind=payload.kind, visibility_mode=normalized_visibility_mode, bg_color=payload.bg_color,
         border_color=payload.border_color, border_style=payload.border_style, border_thickness=payload.border_thickness,
         label_position=payload.label_position, label_align=payload.label_align,
+        checkbox_color=payload.checkbox_color, text_color=payload.text_color,
+        font_size=payload.font_size, label_side=payload.label_side,
         order_index=(max_order or 0) + 1,
     )
     db.add(block)
@@ -1041,6 +1066,7 @@ def create_link(
         b = db.query(RoadmapBlock).filter(RoadmapBlock.id == bid).first()
         if b is None or b.roadmap_id != roadmap.id:
             raise HTTPException(status_code=400, detail="Block does not belong to roadmap")
+        _assert_linkable_block(b, detail="Checkbox blocks cannot be linked")
     link = RoadmapLink(
         roadmap_id=roadmap.id,
         from_block_id=payload.from_block_id,
@@ -1240,6 +1266,10 @@ async def import_roadmaps(
                     border_thickness=block.border_thickness,
                     label_position=block.label_position,
                     label_align=block.label_align,
+                    checkbox_color=block.checkbox_color,
+                    text_color=block.text_color,
+                    font_size=block.font_size,
+                    label_side=block.label_side,
                 )
                 db.add(imported_block)
                 db.flush()
@@ -1477,7 +1507,7 @@ def admin_delete_user(
 def _summarize(db: Session, user_id: str, roadmap_id: str) -> RoadmapProgressSummary:
     total = (
         db.query(func.count(RoadmapBlock.id))
-        .filter(RoadmapBlock.roadmap_id == roadmap_id, RoadmapBlock.kind == "block")
+        .filter(RoadmapBlock.roadmap_id == roadmap_id, RoadmapBlock.kind.in_(TRACKABLE_BLOCK_KINDS))
         .scalar()
         or 0
     )
@@ -1487,7 +1517,7 @@ def _summarize(db: Session, user_id: str, roadmap_id: str) -> RoadmapProgressSum
         .filter(
             UserProgress.user_id == user_id,
             UserProgress.roadmap_id == roadmap_id,
-            RoadmapBlock.kind == "block",
+            RoadmapBlock.kind.in_(TRACKABLE_BLOCK_KINDS),
         )
         .all()
     )
@@ -1529,8 +1559,10 @@ def upsert_progress(
     block = db.query(RoadmapBlock).filter(RoadmapBlock.id == payload.block_id).first()
     if block is None or block.roadmap_id != payload.roadmap_id:
         raise HTTPException(status_code=404, detail="Block not found in roadmap")
-    if block.kind != "block":
-        raise HTTPException(status_code=400, detail="Progress is only available for blocks")
+    if block.kind not in TRACKABLE_BLOCK_KINDS:
+        raise HTTPException(status_code=400, detail="Progress is only available for blocks and checkboxes")
+    if block.kind == "checkbox" and payload.status == "in_progress":
+        raise HTTPException(status_code=400, detail="Checkbox progress only supports not_started and completed")
     roadmap = db.query(Roadmap).filter(Roadmap.id == payload.roadmap_id).first()
     if roadmap is None:
         raise HTTPException(status_code=404, detail="Roadmap not found")

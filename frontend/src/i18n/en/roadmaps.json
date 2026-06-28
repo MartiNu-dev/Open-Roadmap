@@ -117,6 +117,7 @@
       "transparent": "Transparent"
     },
     "backgroundColor": "Background color",
+    "checkboxColor": "Checkbox color",
     "borderColor": "Border color",
     "borderStyle": "Border style",
     "borderStyles": {
@@ -132,11 +133,23 @@
     },
     "labelPosition": "Label position",
     "textAlignment": "Text alignment",
+    "textColor": "Text color",
+    "fontSize": "Text size",
+    "fontSizes": {
+      "xs": "Extra small",
+      "sm": "Small",
+      "base": "Base",
+      "lg": "Large",
+      "xl": "Extra large"
+    },
+    "labelSide": "Text side",
     "saving": "Saving...",
     "autoSaves": "Auto-saves as you type",
     "deleteGroup": "Delete group",
     "deleteBlock": "Delete block",
+    "deleteCheckbox": "Delete checkbox",
     "title": "Title",
+    "checkboxText": "Checkbox text",
     "shortDescription": "Short description",
     "detailedContent": "Detailed content",
     "markdownHelp": "Supports Markdown - headings, **bold**, lists, [links](url), `code`, tables...",
@@ -160,9 +173,11 @@
   "canvas": {
     "editorMode": "Editor mode",
     "addBlock": "Add block",
+    "addCheckbox": "Add checkbox",
     "addGroup": "Add group",
     "toolbarHint": "double-click empty area | drag side handles to link | drag corners to resize | hold SHIFT to snap to grid",
     "addBlockHere": "+ Add block here",
+    "addCheckboxHere": "+ Add checkbox here",
     "addGroupHere": "+ Add group here",
     "tip": "Tip: drag side handles to link | drag corners to resize | hold SHIFT to snap to the 24px grid."
   }

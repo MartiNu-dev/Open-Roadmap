@@ -117,6 +117,7 @@
       "transparent": "Transparent"
     },
     "backgroundColor": "Couleur de fond",
+    "checkboxColor": "Couleur de la case",
     "borderColor": "Couleur de bordure",
     "borderStyle": "Style de bordure",
     "borderStyles": {
@@ -132,11 +133,23 @@
     },
     "labelPosition": "Position du libellé",
     "textAlignment": "Alignement du texte",
+    "textColor": "Couleur du texte",
+    "fontSize": "Taille du texte",
+    "fontSizes": {
+      "xs": "Très petite",
+      "sm": "Petite",
+      "base": "Normale",
+      "lg": "Grande",
+      "xl": "Très grande"
+    },
+    "labelSide": "Côté du texte",
     "saving": "Enregistrement...",
     "autoSaves": "Enregistrement automatique pendant la saisie",
     "deleteGroup": "Supprimer le groupe",
     "deleteBlock": "Supprimer le bloc",
+    "deleteCheckbox": "Supprimer la checkbox",
     "title": "Titre",
+    "checkboxText": "Texte de la checkbox",
     "shortDescription": "Description courte",
     "detailedContent": "Contenu détaillé",
     "markdownHelp": "Supporte Markdown - titres, **gras**, listes, [liens](url), `code`, tableaux...",
@@ -160,9 +173,11 @@
   "canvas": {
     "editorMode": "Mode éditeur",
     "addBlock": "Ajouter un bloc",
+    "addCheckbox": "Ajouter une checkbox",
     "addGroup": "Ajouter un groupe",
     "toolbarHint": "double-cliquez dans une zone vide | glissez les poignées latérales pour lier | glissez les coins pour redimensionner | maintenez SHIFT pour aligner sur la grille",
     "addBlockHere": "+ Ajouter un bloc ici",
+    "addCheckboxHere": "+ Ajouter une checkbox ici",
     "addGroupHere": "+ Ajouter un groupe ici",
     "tip": "Astuce : glissez les poignées latérales pour lier | glissez les coins pour redimensionner | maintenez SHIFT pour aligner sur la grille de 24 px."
   }

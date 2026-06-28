@@ -9,6 +9,13 @@ const NODE_STYLES = {
   optional: "bg-violet-50 border-violet-400 text-violet-900",
   label: "bg-transparent border-transparent text-slate-700 font-display font-semibold",
 };
+const FONT_SIZE_CLASS = {
+  xs: "text-xs",
+  sm: "text-sm",
+  base: "text-base",
+  lg: "text-lg",
+  xl: "text-xl",
+};
 const STATUS_RING = {
   not_started: "", in_progress: "ring-2 ring-blue-500 ring-offset-2",
   completed: "ring-2 ring-emerald-500 ring-offset-2",
@@ -138,10 +145,79 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
   );
 }
 
+function CheckboxNode({ block, status, isEditor, editMode, onMouseDownCheckbox, onResizeMouseDown, onClick, onToggle, suppressClickRef }) {
+  const isEditInteractive = isEditor && editMode;
+  const completed = status === "completed";
+  const labelOnLeft = block.label_side === "left";
+  const fontSizeClass = FONT_SIZE_CLASS[block.font_size] || FONT_SIZE_CLASS.base;
+  const textAlignClass = labelOnLeft ? "text-right" : "text-left";
+
+  const handleClick = () => {
+    if (suppressClickRef.current) return;
+    if (isEditInteractive) {
+      onClick?.(block);
+      return;
+    }
+    onToggle?.(block);
+  };
+
+  return (
+    <div
+      data-block-id={block.id}
+      data-block-kind="checkbox"
+      data-testid={`canvas-checkbox-${block.id}`}
+      className={`absolute select-none group ${isEditInteractive ? "cursor-move" : "cursor-pointer"}`}
+      style={{ left: block.x, top: block.y, width: block.width, height: block.height, zIndex: 1 }}
+      onMouseDown={(e) => onMouseDownCheckbox(e, block)}
+      onClick={handleClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (isEditInteractive && !suppressClickRef.current) onClick?.(block);
+      }}
+    >
+      <div className={`relative flex h-full w-full items-start gap-3 rounded-md px-2 py-2 ${labelOnLeft ? "flex-row-reverse" : "flex-row"} ${isEditInteractive ? "border border-dashed border-slate-300 bg-white/80" : "border border-transparent bg-transparent"}`}>
+        <div
+          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border-2 bg-white"
+          style={{ borderColor: block.checkbox_color, backgroundColor: completed ? block.checkbox_color : "#ffffff" }}
+          data-testid={`checkbox-box-${block.id}`}
+        >
+          {completed ? <Check size={16} className="text-white" strokeWidth={3} /> : null}
+        </div>
+        <div
+          className={`min-w-0 flex-1 whitespace-normal break-words leading-snug ${fontSizeClass} ${textAlignClass} ${completed ? "line-through" : ""}`}
+          style={{ color: block.text_color }}
+          data-testid={`checkbox-label-${block.id}`}
+        >
+          {block.title}
+        </div>
+        {isEditInteractive && ["nw", "ne", "sw", "se"].map((corner) => {
+          const pos = {
+            nw: { left: -6, top: -6 },
+            ne: { right: -6, top: -6 },
+            sw: { left: -6, bottom: -6 },
+            se: { right: -6, bottom: -6 },
+          }[corner];
+          return (
+            <div
+              key={corner}
+              data-no-drag
+              data-resize-corner={corner}
+              data-testid={`resize-${corner}-${block.id}`}
+              className="absolute w-3 h-3 rounded-sm bg-white border-2 border-slate-900 opacity-0 group-hover:opacity-100 hover:scale-125 transition shadow"
+              style={{ ...pos, cursor: RESIZE_CURSOR[corner] }}
+              onMouseDown={(e) => onResizeMouseDown(e, block, corner)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function RoadmapCanvas({
   roadmap, progressByBlock, isEditor, editMode,
   onSelectBlock, onMoveBlock, onCreateLink, onDeleteLink, onSelectLink,
-  onAddBlockAt, onAddGroupAt, onResizeBlock,
+  onAddBlockAt, onAddGroupAt, onAddCheckboxAt, onResizeBlock, onToggleCheckbox,
 }) {
   const { t } = useTranslation("roadmaps");
   const [positions, setPositions] = useState({});
@@ -268,9 +344,10 @@ export default function RoadmapCanvas({
         const element = document.elementFromPoint(e.clientX, e.clientY);
         const card = element?.closest("[data-block-id]");
         const targetId = card?.getAttribute("data-block-id");
+        const targetKind = card?.getAttribute("data-block-kind");
         const anchorEl = element?.closest("[data-anchor-side]");
         const targetSide = anchorEl?.getAttribute("data-anchor-side") || "top";
-        if (targetId && targetId !== drag.fromId && onCreateLink) {
+        if (targetId && targetId !== drag.fromId && targetKind !== "checkbox" && onCreateLink) {
           await onCreateLink({ from_block_id: drag.fromId, to_block_id: targetId, from_side: drag.fromSide, to_side: targetSide });
         }
         setPendingLink(null);
@@ -302,7 +379,8 @@ export default function RoadmapCanvas({
   };
 
   const groups = (roadmap.blocks || []).filter((block) => block.kind === "group");
-  const blocks = (roadmap.blocks || []).filter((block) => block.kind !== "group");
+  const checkboxes = (roadmap.blocks || []).filter((block) => block.kind === "checkbox");
+  const blocks = (roadmap.blocks || []).filter((block) => block.kind === "block");
 
   return (
     <div className="relative" onClick={() => setMenu(null)}>
@@ -311,6 +389,9 @@ export default function RoadmapCanvas({
           <span className="font-mono uppercase text-xs tracking-wider text-slate-500">{t("canvas.editorMode")}</span>
           <button onClick={() => onAddBlockAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-block-btn">
             <Plus size={14} /> {t("canvas.addBlock")}
+          </button>
+          <button onClick={() => onAddCheckboxAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-checkbox-btn">
+            <Check size={14} /> {t("canvas.addCheckbox")}
           </button>
           <button onClick={() => onAddGroupAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-group-btn">
             <Square size={14} /> {t("canvas.addGroup")}
@@ -381,6 +462,26 @@ export default function RoadmapCanvas({
                 onAnchorMouseDown={onAnchorMouseDown}
                 onResizeMouseDown={onResizeMouseDown}
                 onClick={onSelectBlock}
+                suppressClickRef={suppressClickRef}
+              />
+            );
+          })}
+
+          {checkboxes.map((block) => {
+            const point = positions[block.id] || block;
+            const status = progressByBlock?.[block.id]?.status || "not_started";
+            const merged = { ...block, x: point.x, y: point.y, width: point.width, height: point.height };
+            return (
+              <CheckboxNode
+                key={block.id}
+                block={merged}
+                status={status}
+                isEditor={isEditor}
+                editMode={editMode}
+                onMouseDownCheckbox={onMouseDownBlock}
+                onResizeMouseDown={onResizeMouseDown}
+                onClick={onSelectBlock}
+                onToggle={onToggleCheckbox}
                 suppressClickRef={suppressClickRef}
               />
             );
@@ -463,6 +564,11 @@ export default function RoadmapCanvas({
             data-testid="ctx-add-block"
             onClick={() => { onAddBlockAt?.(menu.canvas.x - 110, menu.canvas.y - 22); setMenu(null); }}
           >{t("canvas.addBlockHere")}</button>
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
+            data-testid="ctx-add-checkbox"
+            onClick={() => { onAddCheckboxAt?.(menu.canvas.x - 160, menu.canvas.y - 22); setMenu(null); }}
+          >{t("canvas.addCheckboxHere")}</button>
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-slate-100"
             data-testid="ctx-add-group"
