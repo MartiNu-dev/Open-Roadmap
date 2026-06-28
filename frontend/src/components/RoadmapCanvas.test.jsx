@@ -124,6 +124,61 @@ function buildTextRoadmap(overrides = {}) {
   };
 }
 
+function buildLinkedRoadmap() {
+  return {
+    id: "rm-1",
+    blocks: [
+      {
+        id: "block-1",
+        roadmap_id: "rm-1",
+        title: "Start",
+        short_description: "",
+        detailed_content: "",
+        level: "",
+        estimated_duration: "",
+        order_index: 1,
+        x: 120,
+        y: 80,
+        width: 220,
+        height: 60,
+        node_style: "primary",
+        kind: "block",
+        resources: [],
+      },
+      {
+        id: "block-2",
+        roadmap_id: "rm-1",
+        title: "Finish",
+        short_description: "",
+        detailed_content: "",
+        level: "",
+        estimated_duration: "",
+        order_index: 2,
+        x: 420,
+        y: 220,
+        width: 220,
+        height: 60,
+        node_style: "primary",
+        kind: "block",
+        resources: [],
+      },
+    ],
+    links: [
+      {
+        id: "link-1",
+        from_block_id: "block-1",
+        to_block_id: "block-2",
+        style: "solid",
+        thickness: "medium",
+        color: "#475569",
+        from_side: "bottom",
+        to_side: "top",
+        label: "",
+      },
+    ],
+  };
+}
+
 describe("RoadmapCanvas transparent groups", () => {
   it("stays invisible and non-clickable in viewer mode", () => {
     const onSelectBlock = jest.fn();
@@ -315,5 +370,52 @@ describe("RoadmapCanvas text blocks", () => {
     fireEvent.contextMenu(screen.getByTestId("roadmap-canvas"));
 
     expect(screen.getByTestId("ctx-add-text")).toBeInTheDocument();
+  });
+});
+
+describe("RoadmapCanvas links", () => {
+  it("does not open link configuration in viewer mode", () => {
+    const onSelectLink = jest.fn();
+
+    renderCanvas({
+      roadmap: buildLinkedRoadmap(),
+      progressByBlock: {},
+      isEditor: true,
+      editMode: false,
+      onSelectBlock: jest.fn(),
+      onSelectLink,
+    });
+
+    const linkHitArea = screen.getByTestId("canvas-links").querySelector('path[stroke="transparent"]');
+
+    expect(linkHitArea).not.toBeNull();
+    expect(linkHitArea.getAttribute("class")).toContain("cursor-default");
+
+    fireEvent.click(linkHitArea);
+
+    expect(onSelectLink).not.toHaveBeenCalled();
+  });
+
+  it("opens link configuration in editor mode", () => {
+    const onSelectLink = jest.fn();
+
+    renderCanvas({
+      roadmap: buildLinkedRoadmap(),
+      progressByBlock: {},
+      isEditor: true,
+      editMode: true,
+      onSelectBlock: jest.fn(),
+      onSelectLink,
+    });
+
+    const linkHitArea = screen.getByTestId("canvas-links").querySelector('path[stroke="transparent"]');
+
+    expect(linkHitArea).not.toBeNull();
+    expect(linkHitArea.getAttribute("class")).toContain("cursor-pointer");
+
+    fireEvent.click(linkHitArea);
+
+    expect(onSelectLink).toHaveBeenCalledTimes(1);
+    expect(onSelectLink).toHaveBeenCalledWith(expect.objectContaining({ id: "link-1" }));
   });
 });

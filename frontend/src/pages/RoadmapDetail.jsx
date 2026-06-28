@@ -92,6 +92,11 @@ export default function RoadmapDetail() {
     loadRoadmap();
   }, [roadmapEndpoint, authLoading]);
   useEffect(() => { if (roadmap) loadProgress(roadmap.id); }, [roadmap?.id, user?.id]);
+  useEffect(() => {
+    if (isEditor && editMode) return;
+    setLinkPanelOpen(false);
+    setSelectedLink(null);
+  }, [isEditor, editMode]);
 
   const progressByBlock = useMemo(() => {
     const map = {};
@@ -268,6 +273,7 @@ export default function RoadmapDetail() {
   };
 
   const handleSelectLink = (link) => {
+    if (!isEditor || !editMode) return;
     setSelectedLink(link);
     setLinkPanelOpen(true);
   };

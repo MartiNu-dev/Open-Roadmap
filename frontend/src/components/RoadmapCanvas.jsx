@@ -280,6 +280,7 @@ export default function RoadmapCanvas({
   onAddBlockAt, onAddGroupAt, onAddCheckboxAt, onAddTextAt, onResizeBlock, onToggleCheckbox,
 }) {
   const { t } = useTranslation("roadmaps");
+  const canEditCanvas = isEditor && editMode;
   const [positions, setPositions] = useState({});
   const [pendingLink, setPendingLink] = useState(null);
   const [menu, setMenu] = useState(null);
@@ -339,7 +340,7 @@ export default function RoadmapCanvas({
   }, [positions, textBlocks]);
 
   useEffect(() => {
-    if (!isEditor || !editMode || !onResizeBlock) return;
+    if (!canEditCanvas || !onResizeBlock) return;
     for (const block of textBlocks) {
       const point = positions[block.id] || block;
       const minHeight = textMinHeights[block.id] || 0;
@@ -356,7 +357,7 @@ export default function RoadmapCanvas({
       }));
       void onResizeBlock(block.id, point.x, point.y, point.width, minHeight);
     }
-  }, [editMode, isEditor, onResizeBlock, positions, textBlocks, textMinHeights]);
+  }, [canEditCanvas, onResizeBlock, positions, textBlocks, textMinHeights]);
 
   const canvasPoint = (e) => {
     const rect = wrapRef.current?.getBoundingClientRect();
@@ -365,14 +366,14 @@ export default function RoadmapCanvas({
   };
 
   const onMouseDownBlock = useCallback((e, block) => {
-    if (!isEditor || !editMode) return;
+    if (!canEditCanvas) return;
     if (e.target.closest("[data-no-drag]")) return;
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     const initial = positions[block.id] || block;
     draggingRef.current = { id: block.id, startX: e.clientX, startY: e.clientY, initialX: initial.x, initialY: initial.y, moved: false, kind: "block" };
-  }, [isEditor, editMode, positions]);
+  }, [canEditCanvas, positions]);
 
   const onAnchorMouseDown = (e, block, side) => {
     e.preventDefault();
@@ -383,7 +384,7 @@ export default function RoadmapCanvas({
   };
 
   const onResizeMouseDown = (e, block, corner) => {
-    if (!isEditor || !editMode) return;
+    if (!canEditCanvas) return;
     e.preventDefault();
     e.stopPropagation();
     const point = positions[block.id] || block;
@@ -478,14 +479,14 @@ export default function RoadmapCanvas({
   if (!roadmap) return null;
 
   const handleCanvasDoubleClick = (e) => {
-    if (!isEditor || !editMode) return;
+    if (!canEditCanvas) return;
     if (e.target.closest("[data-block-id]")) return;
     const point = canvasPoint(e);
     onAddBlockAt?.(point.x - 110, point.y - 22);
   };
 
   const handleCanvasContextMenu = (e) => {
-    if (!isEditor || !editMode) return;
+    if (!canEditCanvas) return;
     if (e.target.closest("[data-block-id]")) return;
     e.preventDefault();
     setMenu({ clientX: e.clientX, clientY: e.clientY, canvas: canvasPoint(e) });
@@ -498,7 +499,7 @@ export default function RoadmapCanvas({
 
   return (
     <div className="relative" onClick={() => setMenu(null)}>
-      {isEditor && editMode && (
+      {canEditCanvas && (
         <div className="sticky top-32 z-20 bg-white/95 backdrop-blur border border-slate-200 rounded-md px-3 py-2 mb-3 flex items-center gap-3 text-sm w-fit shadow-sm" data-testid="editor-toolbar">
           <span className="font-mono uppercase text-xs tracking-wider text-slate-500">{t("canvas.editorMode")}</span>
           <button onClick={() => onAddBlockAt?.(120, 120)} className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900" data-testid="editor-add-block-btn">
@@ -541,9 +542,18 @@ export default function RoadmapCanvas({
               return (
                 <g key={link.id}>
                   <path d={curvedPath(start, end, fromSide, toSide)} stroke="transparent" strokeWidth={14} fill="none"
-                    className="cursor-pointer pointer-events-auto"
-                    onClick={(e) => { e.stopPropagation(); onSelectLink?.(link); }}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onSelectLink?.(link); }}
+                    className={`${canEditCanvas ? "cursor-pointer" : "cursor-default"} pointer-events-auto`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!canEditCanvas) return;
+                      onSelectLink?.(link);
+                    }}
+                    onContextMenu={(e) => {
+                      if (!canEditCanvas) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onSelectLink?.(link);
+                    }}
                   />
                   <path d={curvedPath(start, end, fromSide, toSide)} stroke={stroke} strokeWidth={strokeWidth} fill="none" strokeDasharray={dash} className="pointer-events-none" />
                   {link.label && (
@@ -552,7 +562,7 @@ export default function RoadmapCanvas({
                       <text x={mid.x} y={mid.y + 4} textAnchor="middle" fontSize="12" fill={stroke} className="font-mono">{link.label}</text>
                     </g>
                   )}
-                  {isEditor && editMode && (
+                  {canEditCanvas && (
                     <g onClick={(e) => { e.stopPropagation(); onDeleteLink?.(link.id); }} className="cursor-pointer pointer-events-auto">
                       <circle cx={mid.x + 18} cy={mid.y - 14} r="9" fill="white" stroke="#ef4444" />
                       <text x={mid.x + 18} y={mid.y - 10} textAnchor="middle" fontSize="12" fill="#ef4444">×</text>
@@ -661,7 +671,7 @@ export default function RoadmapCanvas({
                   <span className="font-medium text-sm leading-tight">{block.title}</span>
                   <StatusBadge status={status} />
                 </div>
-                {isEditor && editMode && ["top", "right", "bottom", "left"].map((side) => {
+                {canEditCanvas && ["top", "right", "bottom", "left"].map((side) => {
                   const pos = {
                     top: { left: "50%", top: -8, marginLeft: -8 },
                     right: { right: -8, top: "50%", marginTop: -8 },
@@ -677,7 +687,7 @@ export default function RoadmapCanvas({
                     />
                   );
                 })}
-                {isEditor && editMode && ["nw", "ne", "sw", "se"].map((corner) => {
+                {canEditCanvas && ["nw", "ne", "sw", "se"].map((corner) => {
                   const pos = {
                     nw: { left: -6, top: -6 },
                     ne: { right: -6, top: -6 },
@@ -729,7 +739,7 @@ export default function RoadmapCanvas({
         </div>
       )}
 
-      {isEditor && editMode && (
+      {canEditCanvas && (
         <div className="mt-2 text-xs text-slate-500 font-mono">
           {t("canvas.tip")}
         </div>
