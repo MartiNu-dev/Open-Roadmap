@@ -13,7 +13,7 @@ function renderCanvas(props) {
   );
 }
 
-function buildRoadmap(visibilityMode = "transparent") {
+function buildRoadmap(visibilityMode = "transparent", overrides = {}) {
   return {
     id: "rm-1",
     blocks: [
@@ -34,9 +34,13 @@ function buildRoadmap(visibilityMode = "transparent") {
         kind: "group",
         visibility_mode: visibilityMode,
         bg_color: "#0f172a",
+        border_color: "#94a3b8",
+        border_style: "solid",
+        border_thickness: "small",
         label_position: "top",
         label_align: "center",
         resources: [],
+        ...overrides,
       },
     ],
     links: [],
@@ -80,5 +84,27 @@ describe("RoadmapCanvas transparent groups", () => {
     expect(screen.getByTestId("canvas-group-label-group-1")).toHaveTextContent("Hidden anchor");
     expect(screen.getByTestId("anchor-top-group-1")).toBeInTheDocument();
     expect(screen.getByTestId("resize-se-group-1")).toBeInTheDocument();
+  });
+
+  it("renders configured borders for visible groups", () => {
+    renderCanvas({
+      roadmap: buildRoadmap("visible", {
+        bg_color: "#ffffff",
+        border_color: "#ef4444",
+        border_style: "dashed",
+        border_thickness: "large",
+      }),
+      progressByBlock: {},
+      isEditor: false,
+      editMode: false,
+      onSelectBlock: jest.fn(),
+    });
+
+    expect(screen.getByTestId("canvas-group-box-group-1")).toHaveStyle({
+      background: "rgb(255, 255, 255)",
+      borderColor: "rgb(239, 68, 68)",
+      borderStyle: "dashed",
+      borderWidth: "4px",
+    });
   });
 });

@@ -337,6 +337,9 @@ class TestAdminRoadmapImport:
             block = detail.json()["blocks"][0]
             assert block["kind"] == "group"
             assert block["visibility_mode"] == "visible"
+            assert block["border_color"] == "#94a3b8"
+            assert block["border_style"] == "solid"
+            assert block["border_thickness"] == "small"
             assert block["title"] == ""
         finally:
             _delete_by_slug(admin, slug)
@@ -394,7 +397,71 @@ class TestAdminRoadmapImport:
             block = detail.json()["blocks"][0]
             assert block["kind"] == "group"
             assert block["visibility_mode"] == "transparent"
+            assert block["border_color"] == "#94a3b8"
+            assert block["border_style"] == "solid"
+            assert block["border_thickness"] == "small"
             assert block["title"] == ""
+        finally:
+            _delete_by_slug(admin, slug)
+            for suffix in range(2, 6):
+                _delete_by_slug(admin, f"{slug}-{suffix}")
+
+    def test_import_v3_restores_group_border_fields(self):
+        editor = _login(EDITOR)
+        admin = _login(ADMIN)
+        slug = f"import-v3-group-{uuid.uuid4().hex[:8]}"
+        payload = {
+            "format": "open-roadmap-export",
+            "version": 3,
+            "exported_at": "2026-06-24T12:00:00Z",
+            "roadmap": {
+                "slug": slug,
+                "title": "Group border import",
+                "description": "",
+                "status": "published",
+                "cover_emoji": "ðŸ§ª",
+                "tags": "",
+                "level": "mixed",
+                "blocks": [
+                    {
+                        "ref": "group-001",
+                        "title": "",
+                        "short_description": "",
+                        "detailed_content": "",
+                        "level": "",
+                        "estimated_duration": "",
+                        "order_index": 1,
+                        "x": 0,
+                        "y": 0,
+                        "width": 220,
+                        "height": 44,
+                        "node_style": "primary",
+                        "kind": "group",
+                        "visibility_mode": "visible",
+                        "bg_color": "#ffffff",
+                        "border_color": "#ef4444",
+                        "border_style": "dashed",
+                        "border_thickness": "large",
+                        "label_position": "bottom",
+                        "label_align": "center",
+                        "resources": [],
+                    }
+                ],
+                "links": [],
+            },
+        }
+
+        try:
+            response = _import_file(editor, "group-border.json", json.dumps(payload).encode("utf-8"), "application/json")
+            assert response.status_code == 200, response.text
+            created_slug = response.json()["roadmaps"][0]["slug_final"]
+            detail = editor.get(f"{API}/admin/roadmaps/detail/{created_slug}", timeout=REQUEST_TIMEOUT_SECONDS)
+            assert detail.status_code == 200, detail.text
+            block = detail.json()["blocks"][0]
+            assert block["kind"] == "group"
+            assert block["border_color"] == "#ef4444"
+            assert block["border_style"] == "dashed"
+            assert block["border_thickness"] == "large"
         finally:
             _delete_by_slug(admin, slug)
             for suffix in range(2, 6):

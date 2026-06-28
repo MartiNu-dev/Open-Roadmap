@@ -125,6 +125,9 @@ class RoadmapBlock(Base):
     kind = Column(String, nullable=False, default="block")          # block | group
     visibility_mode = Column(String, nullable=False, default="visible")  # visible | transparent (groups only)
     bg_color = Column(String, nullable=False, default="#0f172a")    # group background (slate-900 by default)
+    border_color = Column(String, nullable=False, default="#94a3b8")  # group border (slate-400 by default)
+    border_style = Column(String, nullable=False, default="solid")    # solid | dashed | dotted
+    border_thickness = Column(String, nullable=False, default="small")  # small | medium | large
     label_position = Column(String, nullable=False, default="bottom")  # top | bottom
     label_align = Column(String, nullable=False, default="center")     # left | center | right
 

@@ -99,13 +99,16 @@ class TestAdminRoadmapExport:
 
         payload = response.json()
         assert payload["format"] == "open-roadmap-export"
-        assert payload["version"] == 2
+        assert payload["version"] == 3
         assert payload["roadmap"]["slug"] == "frontend"
         assert payload["roadmap"]["blocks"], "expected seeded roadmap blocks"
         assert payload["roadmap"]["links"], "expected seeded roadmap links"
         first_block = payload["roadmap"]["blocks"][0]
         assert first_block["ref"].startswith("block-")
         assert first_block["visibility_mode"] == "visible"
+        assert first_block["border_color"].startswith("#")
+        assert first_block["border_style"] in ("solid", "dashed", "dotted")
+        assert first_block["border_thickness"] in ("small", "medium", "large")
         assert "id" not in first_block
         first_link = payload["roadmap"]["links"][0]
         assert first_link["from_ref"].startswith("block-")

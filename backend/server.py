@@ -102,8 +102,8 @@ oidc_logger = logging.getLogger("roadmap.oidc")
 app = FastAPI(title="Roadmap Platform API")
 api = APIRouter(prefix="/api")
 EXPORT_FORMAT = "open-roadmap-export"
-EXPORT_VERSION = 2
-SUPPORTED_IMPORT_VERSIONS = {1, 2}
+EXPORT_VERSION = 3
+SUPPORTED_IMPORT_VERSIONS = {1, 2, 3}
 FORBIDDEN_IMPORT_KEYS = {"id", "roadmap_id", "block_id", "from_block_id", "to_block_id"}
 ROADMAP_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 EDITOR_ROLES = ("admin", "editor")
@@ -653,6 +653,9 @@ def _serialize_roadmap_export(
             kind=block.kind,
             visibility_mode=block.visibility_mode,
             bg_color=block.bg_color,
+            border_color=block.border_color,
+            border_style=block.border_style,
+            border_thickness=block.border_thickness,
             label_position=block.label_position,
             label_align=block.label_align,
             resources=[
@@ -858,7 +861,8 @@ def update_block_details(
     normalized_visibility_mode = _normalize_visibility_mode(payload.kind, payload.visibility_mode)
     for field in ("title", "short_description", "detailed_content", "level",
                   "estimated_duration", "node_style", "x", "y", "width", "height",
-                  "kind", "bg_color", "label_position", "label_align"):
+                  "kind", "bg_color", "border_color", "border_style", "border_thickness",
+                  "label_position", "label_align"):
         setattr(block, field, getattr(payload, field))
     block.title = normalized_title
     block.visibility_mode = normalized_visibility_mode
@@ -894,6 +898,7 @@ def create_block(
         node_style=payload.node_style,
         x=payload.x, y=payload.y, width=payload.width, height=payload.height,
         kind=payload.kind, visibility_mode=normalized_visibility_mode, bg_color=payload.bg_color,
+        border_color=payload.border_color, border_style=payload.border_style, border_thickness=payload.border_thickness,
         label_position=payload.label_position, label_align=payload.label_align,
         order_index=(max_order or 0) + 1,
     )
@@ -1230,6 +1235,9 @@ async def import_roadmaps(
                     kind=block.kind,
                     visibility_mode=_normalize_visibility_mode(block.kind, block.visibility_mode),
                     bg_color=block.bg_color,
+                    border_color=block.border_color,
+                    border_style=block.border_style,
+                    border_thickness=block.border_thickness,
                     label_position=block.label_position,
                     label_align=block.label_align,
                 )

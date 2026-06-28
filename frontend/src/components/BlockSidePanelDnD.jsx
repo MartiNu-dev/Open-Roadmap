@@ -23,9 +23,12 @@ const RES_KINDS = ["article", "video", "docs", "course"];
 const STYLE_OPTIONS = ["primary", "alternative", "optional", "label"];
 const LEVEL_OPTIONS = ["", "beginner", "intermediate", "advanced"];
 const GROUP_BG_PRESETS = ["#0f172a", "#1e293b", "#334155", "#1e3a8a", "#065f46", "#7c2d12", "#581c87", "#9f1239"];
+const GROUP_BORDER_PRESETS = ["#94a3b8", "#475569", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444"];
 const POSITIONS = ["top", "bottom"];
 const ALIGNS = ["left", "center", "right"];
 const VISIBILITY_MODES = ["visible", "transparent"];
+const BORDER_STYLES = ["solid", "dashed", "dotted"];
+const BORDER_THICKNESSES = ["small", "medium", "large"];
 
 function sortResources(resources = []) {
   return [...resources].sort((a, b) =>
@@ -175,6 +178,9 @@ export default function BlockSidePanelDnD({
         node_style: block.node_style || "primary",
         visibility_mode: block.visibility_mode || "visible",
         bg_color: block.bg_color || "#0f172a",
+        border_color: block.border_color || "#94a3b8",
+        border_style: block.border_style || "solid",
+        border_thickness: block.border_thickness || "small",
         label_position: block.label_position || "bottom",
         label_align: block.label_align || "center",
       });
@@ -197,6 +203,9 @@ export default function BlockSidePanelDnD({
       || (form.node_style !== (block.node_style || "primary"))
       || (form.visibility_mode !== (block.visibility_mode || "visible"))
       || (form.bg_color !== (block.bg_color || "#0f172a"))
+      || (form.border_color !== (block.border_color || "#94a3b8"))
+      || (form.border_style !== (block.border_style || "solid"))
+      || (form.border_thickness !== (block.border_thickness || "small"))
       || (form.label_position !== (block.label_position || "bottom"))
       || (form.label_align !== (block.label_align || "center"));
     if (!changed) return;
@@ -317,6 +326,63 @@ export default function BlockSidePanelDnD({
                       className="w-7 h-7 rounded-md border-2 border-slate-200 cursor-pointer"
                       data-testid="group-bg-picker"
                     />
+                  </div>
+                </div>
+                <div>
+                  <Label>{t("blockPanel.borderColor")}</Label>
+                  <div className="flex flex-wrap gap-2 mt-1 items-center" data-testid="group-border-presets">
+                    {GROUP_BORDER_PRESETS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setField("border_color", color)}
+                        className={`w-7 h-7 rounded-md border-2 transition ${form.border_color === color ? "border-slate-900 scale-110" : "border-slate-200"}`}
+                        style={{ background: color }}
+                        data-testid={`group-border-${color.replace("#", "")}`}
+                        aria-label={`${t("blockPanel.borderColor")} ${color}`}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={form.border_color}
+                      onChange={(e) => setField("border_color", e.target.value)}
+                      className="w-7 h-7 rounded-md border-2 border-slate-200 cursor-pointer"
+                      data-testid="group-border-picker"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t("blockPanel.borderStyle")}</Label>
+                    <div className="mt-1 flex gap-2">
+                      {BORDER_STYLES.map((style) => (
+                        <button
+                          key={style}
+                          type="button"
+                          onClick={() => setField("border_style", style)}
+                          data-testid={`group-border-style-${style}`}
+                          className={`px-3 py-1 text-xs rounded-md border ${form.border_style === style ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-700"}`}
+                        >
+                          {t(`blockPanel.borderStyles.${style}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>{t("blockPanel.borderThickness")}</Label>
+                    <div className="mt-1 flex gap-2">
+                      {BORDER_THICKNESSES.map((thickness) => (
+                        <button
+                          key={thickness}
+                          type="button"
+                          onClick={() => setField("border_thickness", thickness)}
+                          data-testid={`group-border-thickness-${thickness}`}
+                          className={`px-3 py-1 text-xs rounded-md border ${form.border_thickness === thickness ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-700"}`}
+                        >
+                          {t(`blockPanel.borderThicknesses.${thickness}`)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

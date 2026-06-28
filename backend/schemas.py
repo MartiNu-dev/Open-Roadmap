@@ -132,6 +132,9 @@ class BlockOut(BaseModel):
     kind: str = "block"
     visibility_mode: str = "visible"
     bg_color: str = "#0f172a"
+    border_color: str = "#94a3b8"
+    border_style: str = "solid"
+    border_thickness: str = "small"
     label_position: str = "bottom"
     label_align: str = "center"
     resources: List[ResourceOut] = []
@@ -172,6 +175,9 @@ class BlockUpsertIn(BaseModel):
     kind: Literal["block", "group"] = "block"
     visibility_mode: VisibilityMode = "visible"
     bg_color: str = "#0f172a"
+    border_color: str = "#94a3b8"
+    border_style: Literal["solid", "dashed", "dotted"] = "solid"
+    border_thickness: Literal["small", "medium", "large"] = "small"
     label_position: Literal["top", "bottom"] = "bottom"
     label_align: Literal["left", "center", "right"] = "center"
 
@@ -305,6 +311,9 @@ class RoadmapExportBlock(BaseModel):
     kind: str = "block"
     visibility_mode: VisibilityMode = "visible"
     bg_color: str = "#0f172a"
+    border_color: str = "#94a3b8"
+    border_style: Literal["solid", "dashed", "dotted"] = "solid"
+    border_thickness: Literal["small", "medium", "large"] = "small"
     label_position: str = "bottom"
     label_align: str = "center"
     resources: List[RoadmapExportResource] = []

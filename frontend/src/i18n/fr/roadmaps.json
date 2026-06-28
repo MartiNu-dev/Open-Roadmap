@@ -117,6 +117,19 @@
       "transparent": "Transparent"
     },
     "backgroundColor": "Couleur de fond",
+    "borderColor": "Couleur de bordure",
+    "borderStyle": "Style de bordure",
+    "borderStyles": {
+      "solid": "Plein",
+      "dashed": "Tireté",
+      "dotted": "Pointillé"
+    },
+    "borderThickness": "Épaisseur de bordure",
+    "borderThicknesses": {
+      "small": "Fine",
+      "medium": "Moyenne",
+      "large": "Large"
+    },
     "labelPosition": "Position du libellé",
     "textAlignment": "Alignement du texte",
     "saving": "Enregistrement...",

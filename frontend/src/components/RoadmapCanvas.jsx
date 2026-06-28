@@ -20,6 +20,7 @@ const LEVEL_CROWN = {
 };
 const THICKNESS = { small: 1.5, medium: 2.5, large: 4 };
 const DASH = { solid: "", dashed: "8 6", dotted: "2 5" };
+const BORDER_WIDTH = { small: 1.5, medium: 2.5, large: 4 };
 const ANCHOR_POS = {
   top: (p) => ({ x: p.x + p.width / 2, y: p.y }),
   right: (p) => ({ x: p.x + p.width, y: p.y + p.height / 2 }),
@@ -56,6 +57,12 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
   const showTransparentChrome = isTransparent && isEditInteractive;
   const showLabel = block.title && (!isTransparent || showTransparentChrome);
   const labelClassName = `px-3 py-1 text-xs font-mono uppercase tracking-wider ${alignCls}`;
+  const groupStyle = {
+    background: block.bg_color || "#0f172a",
+    borderColor: block.border_color || "#94a3b8",
+    borderStyle: block.border_style || "solid",
+    borderWidth: BORDER_WIDTH[block.border_thickness] || BORDER_WIDTH.small,
+  };
 
   return (
     <div
@@ -69,7 +76,7 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
       onContextMenu={isInteractive ? (e) => { e.preventDefault(); if (!suppressClickRef.current) onClick?.(block); } : undefined}
     >
       {showTransparentChrome ? (
-        <div className="relative flex h-full w-full flex-col rounded-md border border-dashed border-slate-300 bg-white/40">
+        <div className="relative flex h-full w-full flex-col rounded-md border border-dashed border-slate-300 bg-white/40" data-testid={`canvas-group-box-${block.id}`}>
           {showLabel && labelTop && (
             <div className={labelClassName} style={{ color: "#475569" }} data-testid={`canvas-group-label-${block.id}`}>{block.title}</div>
           )}
@@ -81,7 +88,7 @@ function GroupNode({ block, isEditor, editMode, onMouseDownGroup, onAnchorMouseD
           )}
         </div>
       ) : isTransparent ? null : (
-        <div className="relative w-full h-full rounded-md flex flex-col" style={{ background: block.bg_color || "#0f172a" }}>
+        <div className="relative w-full h-full rounded-md border flex flex-col" style={groupStyle} data-testid={`canvas-group-box-${block.id}`}>
           {showLabel && labelTop && (
             <div className={labelClassName} style={labelStyle}>{block.title}</div>
           )}

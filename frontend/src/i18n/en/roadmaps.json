@@ -117,6 +117,19 @@
       "transparent": "Transparent"
     },
     "backgroundColor": "Background color",
+    "borderColor": "Border color",
+    "borderStyle": "Border style",
+    "borderStyles": {
+      "solid": "Solid",
+      "dashed": "Dashed",
+      "dotted": "Dotted"
+    },
+    "borderThickness": "Border thickness",
+    "borderThicknesses": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
+    },
     "labelPosition": "Label position",
     "textAlignment": "Text alignment",
     "saving": "Saving...",

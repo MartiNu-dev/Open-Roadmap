@@ -179,6 +179,7 @@ export default function RoadmapDetail() {
         title: "Group", short_description: "", detailed_content: "",
         level: "", estimated_duration: "", node_style: "primary",
         kind: "group", visibility_mode: "visible", bg_color: "#0f172a", label_position: "bottom", label_align: "center",
+        border_color: "#94a3b8", border_style: "solid", border_thickness: "small",
         x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)), width: 360, height: 200,
       });
       setRoadmap((current) => ({ ...current, blocks: [...current.blocks, data] }));

@@ -52,6 +52,9 @@ def run_migrations(engine: Engine) -> None:
         "kind": "VARCHAR NOT NULL DEFAULT 'block'",
         "visibility_mode": "VARCHAR NOT NULL DEFAULT 'visible'",
         "bg_color": "VARCHAR NOT NULL DEFAULT '#0f172a'",
+        "border_color": "VARCHAR NOT NULL DEFAULT '#94a3b8'",
+        "border_style": "VARCHAR NOT NULL DEFAULT 'solid'",
+        "border_thickness": "VARCHAR NOT NULL DEFAULT 'small'",
         "label_position": "VARCHAR NOT NULL DEFAULT 'bottom'",
         "label_align": "VARCHAR NOT NULL DEFAULT 'center'",
     }

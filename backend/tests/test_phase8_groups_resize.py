@@ -53,6 +53,9 @@ class TestBlockOutShape:
             assert b.get("kind") in ("block", "group")
             assert b.get("visibility_mode") in ("visible", "transparent")
             assert "bg_color" in b and isinstance(b["bg_color"], str) and b["bg_color"].startswith("#")
+            assert "border_color" in b and isinstance(b["border_color"], str) and b["border_color"].startswith("#")
+            assert b.get("border_style") in ("solid", "dashed", "dotted")
+            assert b.get("border_thickness") in ("small", "medium", "large")
             assert b.get("label_position") in ("top", "bottom")
             assert b.get("label_align") in ("left", "center", "right")
 
@@ -69,6 +72,9 @@ class TestCreateGroup:
                 "kind": "group",
                 "visibility_mode": "transparent",
                 "bg_color": "#1e3a8a",
+                "border_color": "#ef4444",
+                "border_style": "dashed",
+                "border_thickness": "large",
                 "label_position": "top",
                 "label_align": "left",
                 "width": 400,
@@ -82,6 +88,9 @@ class TestCreateGroup:
             assert body["kind"] == "group"
             assert body["visibility_mode"] == "transparent"
             assert body["bg_color"] == "#1e3a8a"
+            assert body["border_color"] == "#ef4444"
+            assert body["border_style"] == "dashed"
+            assert body["border_thickness"] == "large"
             assert body["label_position"] == "top"
             assert body["label_align"] == "left"
             assert body["width"] == 400
@@ -96,6 +105,9 @@ class TestCreateGroup:
             assert m["kind"] == "group"
             assert m["visibility_mode"] == "transparent"
             assert m["bg_color"] == "#1e3a8a"
+            assert m["border_color"] == "#ef4444"
+            assert m["border_style"] == "dashed"
+            assert m["border_thickness"] == "large"
             assert m["label_position"] == "top"
             assert m["label_align"] == "left"
         finally:
@@ -145,6 +157,9 @@ class TestPutUpdatesGroupFields:
                 "kind": "group",
                 "visibility_mode": "transparent",
                 "bg_color": "#7c3aed",
+                "border_color": "#0ea5e9",
+                "border_style": "dotted",
+                "border_thickness": "medium",
                 "label_position": "top",
                 "label_align": "right",
                 "width": 300, "height": 150, "x": 100, "y": 100,
@@ -154,6 +169,9 @@ class TestPutUpdatesGroupFields:
             o = r2.json()
             assert o["visibility_mode"] == "transparent"
             assert o["bg_color"] == "#7c3aed"
+            assert o["border_color"] == "#0ea5e9"
+            assert o["border_style"] == "dotted"
+            assert o["border_thickness"] == "medium"
             assert o["label_position"] == "top"
             assert o["label_align"] == "right"
             assert o["title"] == "TEST_put_phase8_renamed"
@@ -163,6 +181,9 @@ class TestPutUpdatesGroupFields:
             m = next(b for b in d["blocks"] if b["id"] == bid)
             assert m["visibility_mode"] == "transparent"
             assert m["bg_color"] == "#7c3aed"
+            assert m["border_color"] == "#0ea5e9"
+            assert m["border_style"] == "dotted"
+            assert m["border_thickness"] == "medium"
             assert m["label_align"] == "right"
         finally:
             for bid in created_ids:
